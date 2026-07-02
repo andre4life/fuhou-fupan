@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>访后复盘引擎 V3.0 | 展业小助手</title>
+<style>
+:root{--slate:#2C5282;--purple:#6B46C1;--plum:#7B2D8E;--bg:#FBF9F6;--card:#fff;--text:#2D3748;--muted:#718096;--border:#E2E8F0;--green:#2F855A;--red:#C53030;--amber:#C05621;--teal:#319795}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+.container{max-width:900px;margin:0 auto;padding:20px 16px}
+
+/* Header */
+.header{background:linear-gradient(135deg,var(--slate),#3B6CB4);color:#fff;padding:20px 24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.header-left h1{font-size:20px;margin-bottom:2px}
+.header-left p{font-size:12px;opacity:.75}
+.header-right{display:flex;align-items:center;gap:8px}
+.header-right .badge{background:rgba(255,255,255,.15);padding:4px 12px;border-radius:20px;font-size:11px}
+.customer-input{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;width:140px;outline:none;transition:all .2s}
+.customer-input::placeholder{color:rgba(255,255,255,.45)}
+.customer-input:focus{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.18)}
+
+/* Nav Tabs */
+.nav-tabs{display:flex;background:var(--card);border-bottom:2px solid var(--border);padding:0 24px}
+.nav-tab{padding:12px 24px;cursor:pointer;font-size:14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:6px}
+.nav-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.nav-tab .count{background:var(--purple);color:#fff;font-size:11px;padding:1px 7px;border-radius:10px}
+
+/* Card */
+.card{background:var(--card);padding:24px;border-radius:0 0 16px 16px;box-shadow:0 2px 12px rgba(0,0,0,.03)}
+
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
+.tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+.template-guide{background:#F0EBF8;border-radius:10px;padding:14px 18px;margin-bottom:14px;font-size:13px;line-height:2}
+.template-guide strong{color:var(--purple)}
+.review-textarea{width:100%;min-height:280px;padding:14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;line-height:1.8;resize:vertical;background:#FDFBFA}
+.review-textarea:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(107,70,193,.06)}
+
+.record-area{text-align:center;padding:36px 20px;border:2px dashed var(--border);border-radius:14px;margin-bottom:14px}
+.record-btn{width:68px;height:68px;border-radius:50%;border:none;background:var(--purple);color:#fff;font-size:30px;cursor:pointer;transition:all .2s}
+.record-btn:hover{background:#5a2d9e;transform:scale(1.05)}
+.record-btn.recording{background:var(--red);animation:pulse2 1.2s infinite}
+@keyframes pulse2{0%,100%{box-shadow:0 0 0 0 rgba(197,48,48,.4)}50%{box-shadow:0 0 0 16px rgba(197,48,48,0)}}
+.record-status{font-size:13px;color:var(--muted);margin-top:8px}
+.transcribed-text{background:#F7FAFC;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px;font-size:14px;max-height:200px;overflow-y:auto;white-space:pre-wrap;display:none}
+.transcribed-text.show{display:block}
+
+.btn{display:block;width:100%;padding:12px;background:var(--purple);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:all .2s}
+.btn:hover{background:#5a2d9e}
+.btn:disabled{background:#c4b5e0;cursor:not-allowed}
+.btn-sm{padding:7px 18px;font-size:12px;width:auto;display:inline-block}
+.btn-outline{background:transparent;border:1.5px solid var(--purple);color:var(--purple)}
+.btn-outline:hover{background:var(--purple);color:#fff}
+.btn-green{background:var(--green)}
+.btn-green:hover{background:#236b42}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+/* Output */
+.output-section{background:var(--card);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.03);overflow:hidden;margin-top:24px}
+.output-header{background:var(--slate);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.output-header h2{font-size:16px}
+.output-header .actions{display:flex;gap:6px;flex-wrap:wrap}
+.output-header .actions button{padding:7px 14px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:transparent;color:#fff;font-size:11px;cursor:pointer;transition:all .15s}
+.output-header .actions button:hover{background:rgba(255,255,255,.12)}
+.output-body{max-height:60vh;overflow-y:auto;padding:22px;font-size:14px}
+
+/* History Panel */
+.history-panel{display:none}
+.history-panel.active{display:block}
+.history-filter{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.history-filter input,.history-filter select{padding:8px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;flex:1;min-width:140px}
+.history-filter input:focus,.history-filter select:focus{border-color:var(--purple)}
+.history-list{max-height:60vh;overflow-y:auto}
+.history-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all .15s}
+.history-item:hover{border-color:var(--purple);box-shadow:0 2px 8px rgba(107,70,193,.06)}
+.hi-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hi-name{font-weight:600;font-size:15px;color:var(--slate)}
+.hi-date{font-size:12px;color:var(--muted)}
+.hi-preview{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.hi-tag{font-size:11px;background:#EDF2F7;color:var(--slate);padding:2px 8px;border-radius:10px}
+.hi-actions{margin-top:8px;display:flex;gap:6px}
+.hi-actions button{padding:3px 10px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;transition:all .1s}
+.hi-actions button:hover{background:var(--purple);color:#fff;border-color:var(--purple)}
+.hi-actions .btn-del:hover{background:var(--red);border-color:var(--red)}
+.history-empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.history-empty .icon{font-size:48px;margin-bottom:12px}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-box{background:#fff;border-radius:16px;max-width:800px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-header{background:var(--slate);color:#fff;padding:16px 24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center}
+.modal-header button{background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px}
+.modal-body{padding:24px;font-size:14px}
+.modal-body .sec-title{font-size:15px;font-weight:700;color:var(--slate);margin:18px 0 8px;padding-left:12px;border-left:3px solid var(--purple)}
+
+/* Admin Panel */
+.admin-banner{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:16px 24px;border-radius:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.admin-banner h3{font-size:16px}
+.admin-banner .admin-btns{display:flex;gap:8px}
+.admin-banner .admin-btns button{padding:6px 14px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;font-size:12px;cursor:pointer;transition:all .15s}
+.admin-banner .admin-btns button:hover{background:rgba(255,255,255,.18)}
+.admin-table-wrap{overflow-x:auto;background:var(--card);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.admin-table{width:100%;border-collapse:collapse;font-size:12px}
+.admin-table th{background:var(--slate);color:#fff;padding:10px 12px;text-align:left;font-size:11px;white-space:nowrap}
+.admin-table td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.admin-table tr:hover{background:#F7F9FC}
+.admin-table .a-preview{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:var(--muted)}
+.admin-table .a-preview:hover{color:var(--text)}
+.a-tag{display:inline-block;background:#E8E0F0;color:var(--purple);padding:1px 7px;border-radius:8px;font-size:10px;margin:1px 2px}
+.a-btn{padding:3px 10px;border:1px solid var(--border);border-radius:5px;background:#fff;font-size:10px;cursor:pointer;margin:1px 2px}
+.a-btn:hover{background:var(--purple);color:#fff;border-color:var(--purple)}
+
+/* Status */
+.status-bar{position:fixed;bottom:16px;right:16px;background:var(--green);color:#fff;padding:8px 18px;border-radius:20px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:200;transition:all .3s;opacity:0;transform:translateY(10px)}
+.status-bar.show{opacity:1;transform:translateY(0)}
+.status-bar.error{background:var(--red)}
+
+/* File upload area */
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;margin-top:12px;cursor:pointer;transition:all .2s}
+.upload-zone:hover{border-color:var(--purple);background:#F8F6FC}
+
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+@media(max-width:600px){
+  .container{padding:10px 8px}
+  .header{padding:14px 16px;flex-direction:column;align-items:flex-start}
+  .nav-tab{padding:10px 14px;font-size:13px}
+  .admin-table{font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <h1>访后复盘引擎 V3.0</h1>
+    <p>记录 · 分析 · 成长 — 每次复盘都看得见</p>
+  </div>
+  <div class="header-right">
+    <input class="customer-input" id="customerName" placeholder="客户姓名(必填)" onchange="persistCustomerName()">
+    <span class="badge" id="reviewCount">0条记录</span>
+  </div>
+</div>
+
+<!-- Nav -->
+<div class="nav-tabs">
+  <div class="nav-tab active" onclick="switchMainTab('review')">📝 新建复盘</div>
+  <div class="nav-tab" onclick="switchMainTab('history')">📚 历史记录 <span class="count" id="historyCount">0</span></div>
+  <div class="nav-tab" onclick="switchMainTab('admin')">🔐 开发者后台</div>
+</div>
+
+<!-- ===== 新建复盘 ===== -->
+<div class="card" id="reviewPanel">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('record')">🎙️ 语音复盘</div>
+    <div class="tab" onclick="switchTab('manual')">✍️ 手动填写</div>
+  </div>
+  <div class="tab-content active" id="tab-record">
+    <div class="template-guide">
+      <strong>📋 语音复盘模板：</strong><br>
+      "今天见了客户<strong>XX岁/职业/收入</strong>，主要聊了<strong>XX</strong>。<br>
+      客户提出异议：<strong>1...2...</strong>。我的回应：<strong>XX</strong>。<br>
+      情绪变化：<strong>XX → XX → XX</strong>。结果：<strong>XX</strong>。反思：<strong>XX</strong>。"
+    </div>
+    <div class="record-area">
+      <button class="record-btn" id="recBtn" onclick="toggleRecording()">🎙️</button>
+      <div class="record-status" id="recStatus">点击录音，照模板说（说完再点一次停止）</div>
+    </div>
+    <div class="transcribed-text" id="transcribedText"></div>
+  </div>
+  <div class="tab-content" id="tab-manual">
+    <div class="template-guide"><strong>📋 填写模板：</strong> 客户画像→讨论主题→异议处理→结果反思</div>
+    <textarea class="review-textarea" id="manualText" placeholder="在此粘贴或手写复盘内容...&#10;&#10;1. 客户画像：年龄/职业/收入/家庭&#10;2. 讨论主题：聊了什么&#10;3. 客户异议：反对什么 + 我怎么回的&#10;4. 情绪变化：态度怎么变&#10;5. 结果与反思：谈成了吗？哪里不够好？"></textarea>
+  </div>
+  <button class="btn" id="analyzeBtn" onclick="analyzeReview()">🔍 开始分析</button>
+  <div class="output-section" id="outputCard" style="display:none">
+    <div class="output-header">
+      <h2>📊 复盘分析报告</h2>
+      <div class="actions">
+        <button onclick="copyReport()">📋 复制</button>
+        <button onclick="downloadReport()">📥 下载MD</button>
+        <button onclick="saveToLocal()">💾 保存</button>
+        <button onclick="backToInput()">✏️ 返回修改</button>
+      </div>
+    </div>
+    <div class="output-body" id="outputBody"></div>
+  </div>
+</div>
+
+<!-- ===== 历史记录 ===== -->
+<div class="card history-panel" id="historyPanel" style="border-radius:0 0 16px 16px">
+  <div class="history-filter">
+    <input type="text" id="historySearch" placeholder="🔍 搜索客户名或关键词..." oninput="renderHistory()">
+    <select id="historySort" onchange="renderHistory()">
+      <option value="newest">最新在前</option><option value="oldest">最早在前</option>
+    </select>
+    <button class="btn-sm btn-outline" onclick="exportAllDB()">📥 导出全部</button>
+  </div>
+  <div class="history-list" id="historyList">
+    <div class="history-empty" id="historyEmpty">
+      <div class="icon">📭</div><p>暂无复盘记录</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 开发者后台 ===== -->
+<div class="card history-panel" id="adminPanel" style="border-radius:0 0 16px 16px">
+  <div class="admin-banner">
+    <div><h3>🔐 开发者后台</h3><span style="font-size:11px;opacity:.7">本地数据库 · 所有用户记录</span></div>
+    <div class="admin-btns">
+      <button onclick="exportAllDB()">📥 导出JSON备份</button>
+      <button onclick="document.getElementById('importFile').click()">📤 导入JSON备份</button>
+      <button onclick="clearAllDB()" style="border-color:rgba(255,100,100,.5)">🗑 清空数据库</button>
+    </div>
+  </div>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importDB(this)">
+  <div id="adminStats" style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap"></div>
+  <div class="history-filter">
+    <input type="text" id="adminSearch" placeholder="🔍 搜索..." oninput="renderAdminTable()">
+    <select id="adminSort" onchange="renderAdminTable()">
+      <option value="newest">最新在前</option><option value="oldest">最早在前</option>
+    </select>
+  </div>
+  <div class="admin-table-wrap">
+    <table class="admin-table">
+      <thead><tr><th>时间</th><th>客户</th><th>画像</th><th>预览</th><th>标签</th><th>操作</th></tr></thead>
+      <tbody id="adminTableBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">📭 暂无数据</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="modalTitle">复盘详情</span>
+      <button onclick="closeModal()">✕ 关闭</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="status-bar" id="statusBar"></div>
+
+<script>
+// ===== 数据库 =====
+var DB_KEY = 'review_engine_v3_db';
+var currentReport = null;
+var currentReportHTML = '';
+var kbItems = [];
+var kbLoaded = false;
+
+function loadDB(){
+  try{var d=localStorage.getItem(DB_KEY);return d?JSON.parse(d):[]}
+  catch(e){return[]}
+}
+function saveDB(data){localStorage.setItem(DB_KEY, JSON.stringify(data))}
+function getDB(){return loadDB()}
+function setDB(data){saveDB(data)}
+
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded',function(){
+  var name=localStorage.getItem('lastCustomerName');
+  if(name)document.getElementById('customerName').value=name;
+  updateCounts();
+  loadKBIndex();
+});
+function persistCustomerName(){
+  var name=document.getElementById('customerName').value.trim();
+  if(name)localStorage.setItem('lastCustomerName',name);
+}
+function updateCounts(){
+  var n=getDB().length;
+  document.getElementById('reviewCount').textContent=n+'条记录';
+  document.getElementById('historyCount').textContent=n;
+}
+
+// ===== Tab =====
+function switchMainTab(tab){
+  document.querySelectorAll('.nav-tab').forEach(function(el){el.classList.remove('active')});
+  if(tab==='review'){
+    document.querySelectorAll('.nav-tab')[0].classList.add('active');
+    document.getElementById('reviewPanel').style.display='block';
+    document.getElementById('historyPanel').classList.remove('active');
+    document.getElementById('adminPanel').classList.remove('active');
+  }else if(tab==='history'){
+    document.querySelectorAll('.nav-tab')[1].classList.add('active');
+    document.getElementById('reviewPanel').style.display='none';
+    document.getElementById('historyPanel').classList.add('active');
+    document.getElementById('adminPanel').classList.remove('active');
+    renderHistory();
+  }else{
+    document.querySelectorAll('.nav-tab')[2].classList.add('active');
+    document.getElementById('reviewPanel').style.display='none';
+    document.getElementById('historyPanel').classList.remove('active');
+    document.getElementById('adminPanel').classList.add('active');
+    renderAdmin();
+  }
+}
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(function(el){el.classList.remove('active')});
+  document.querySelectorAll('.tab-content').forEach(function(el){el.classList.remove('active')});
+  if(tab==='record'){document.querySelectorAll('.tab')[0].classList.add('active');document.getElementById('tab-record').classList.add('active')}
+  else{document.querySelectorAll('.tab')[1].classList.add('active');document.getElementById('tab-manual').classList.add('active')}
+}
+
+// ===== 语音 =====
+var sr=null, reviewText='';
+function toggleRecording(){
+  var btn=document.getElementById('recBtn');
+  if(btn.classList.contains('recording')){stopVoiceReview();return}
+  if(!sr){
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    sr=new SR();sr.lang='zh-CN';sr.interimResults=true;sr.continuous=true;
+    sr.onresult=function(e){var t='';for(var i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;reviewText=t;var el=document.getElementById('transcribedText');el.textContent=t;el.style.color='var(--text)';if(t.length>0)el.classList.add('show')};
+    sr.onerror=function(e){document.getElementById('recStatus').textContent='⚠️ '+e.error;stopVoiceReview()};
+    sr.onend=function(){btn.classList.remove('recording');if(reviewText.length>0){document.getElementById('recStatus').textContent='✅ 已识别 '+reviewText.length+' 字';}else{document.getElementById('recStatus').textContent='未识别到内容'}};
+  }
+  reviewText='';document.getElementById('transcribedText').textContent='';document.getElementById('transcribedText').classList.remove('show');
+  sr.start();btn.classList.add('recording');document.getElementById('recStatus').textContent='🎙️ 正在听...';
+}
+function stopVoiceReview(){if(sr)sr.stop();document.getElementById('recBtn').classList.remove('recording')}
+
+// ===== 分析引擎 =====
+async function analyzeReview(){
+  try{
+    var cname=document.getElementById('customerName').value.trim();
+    if(!cname){alert('请先输入客户姓名');return}
+    var txt='';
+    if(document.getElementById('tab-record').classList.contains('active')){txt=reviewText.trim();if(!txt){alert('请先录音或切换手动填写');return}}
+    else{txt=document.getElementById('manualText').value.trim()}
+    if(!txt||txt.length<20){alert('内容太短，至少20字');return}
+
+    // 禁用按钮，显示处理中
+    var btn=document.getElementById('analyzeBtn');
+    btn.disabled=true;btn.textContent='🔍 正在分析并检索知识库...';
+
+    // Step 1: 生成核心分析报告
+    currentReportHTML=buildReport(txt);
+    currentReport={customerName:cname,customerInfo:extractProfile(txt),rawText:txt,tags:extractThemes(txt).split('、').filter(Boolean)};
+
+    // Step 2: 并行检索知识库
+    var kbResults=await searchKBForTopics(txt);
+
+    // Step 3: 富化报告——插入知识库参考建议
+    var enrichedHTML=enrichWithKB(currentReportHTML,kbResults,txt);
+    currentReportHTML=enrichedHTML;
+    currentReport.analysis=enrichedHTML;
+
+    document.getElementById('outputBody').innerHTML=enrichedHTML;
+    document.getElementById('outputCard').style.display='block';
+    btn.disabled=false;btn.textContent='🔍 开始分析';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    document.getElementById('analyzeBtn').disabled=false;
+    document.getElementById('analyzeBtn').textContent='🔍 开始分析';
+    alert('分析出错：'+e.message)
+  }
+}
+
+// ===== 保存 =====
+function saveToLocal(){
+  if(!currentReport){alert('请先完成复盘分析');return}
+  var db=getDB();
+  db.push({
+    id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    customerName:currentReport.customerName,
+    customerInfo:currentReport.customerInfo,
+    rawText:currentReport.rawText,
+    analysis:currentReportHTML,
+    tags:currentReport.tags,
+    createdAt:new Date().toISOString().slice(0,19).replace('T',' ')
+  });
+  setDB(db);updateCounts();
+  showStatus('✅ 已保存！共'+db.length+'条记录',false);
+  currentReport=null;currentReportHTML='';
+  document.getElementById('outputCard').style.display='none';
+}
+
+// ===== 历史 =====
+function renderHistory(){
+  var db=getDB();
+  var search=(document.getElementById('historySearch').value||'').toLowerCase();
+  var sort=document.getElementById('historySort').value;
+  db=db.filter(function(r){return!search||(r.customerName||'').toLowerCase().indexOf(search)>-1||(r.rawText||'').toLowerCase().indexOf(search)>-1});
+  if(sort==='oldest')db.reverse();
+  var list=document.getElementById('historyList');
+  var empty=document.getElementById('historyEmpty');
+  if(db.length===0){list.innerHTML='';list.appendChild(empty);empty.style.display='block';return}
+  empty.style.display='none';
+  var h='';
+  db.forEach(function(r){
+    var p=(r.rawText||'').replace(/<[^>]*>/g,'').substring(0,80);
+    var t=(r.tags||[]).map(function(x){return'<span class="hi-tag">'+escHtml(x)+'</span>'}).join('');
+    h+='<div class="history-item">';
+    h+='<div class="hi-top"><span class="hi-name">👤 '+escHtml(r.customerName||'未命名')+'</span><span class="hi-date">'+r.createdAt+'</span></div>';
+    h+='<div class="hi-preview" onclick="viewDetail(\''+r.id+'\')">'+escHtml(p)+'</div>';
+    h+='<div class="hi-tags">'+t+'</div>';
+    h+='<div class="hi-actions"><button onclick="viewDetail(\''+r.id+'\')">查看详情</button><button class="btn-del" onclick="deleteOne(\''+r.id+'\')">删除</button></div>';
+    h+='</div>';
+  });
+  list.innerHTML=h;
+}
+
+function viewDetail(id){
+  var r=getDB().find(function(x){return x.id===id});
+  if(!r)return;
+  document.getElementById('modalTitle').textContent='复盘详情：'+r.customerName+' | '+r.createdAt;
+  document.getElementById('modalBody').innerHTML=r.analysis||'<p>暂无分析</p>';
+  document.getElementById('detailModal').classList.add('show');
+}
+function closeModal(){document.getElementById('detailModal').classList.remove('show')}
+function deleteOne(id){
+  if(!confirm('确定删除此条复盘？'))return;
+  setDB(getDB().filter(function(r){return r.id!==id}));
+  updateCounts();renderHistory();renderAdmin();
+  showStatus('已删除',false);
+}
+
+// ===== 管理员后台 =====
+function renderAdmin(){
+  renderAdminStats();
+  renderAdminTable();
+}
+function renderAdminStats(){
+  var db=getDB();
+  var now=new Date();
+  var weekAgo=new Date(now-7*24*60*60*1000).toISOString().slice(0,10);
+  var monthAgo=new Date(now-30*24*60*60*1000).toISOString().slice(0,10);
+  var customers=[...new Set(db.map(function(r){return r.customerName}))];
+  var h='';
+  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--slate)">'+db.length+'</div><div style="font-size:11px;color:var(--muted)">📊 总记录</div></div>';
+  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--purple)">'+db.filter(function(r){return r.createdAt>=weekAgo}).length+'</div><div style="font-size:11px;color:var(--muted)">📅 本周</div></div>';
+  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--teal)">'+db.filter(function(r){return r.createdAt>=monthAgo}).length+'</div><div style="font-size:11px;color:var(--muted)">📆 本月</div></div>';
+  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--amber)">'+customers.length+'</div><div style="font-size:11px;color:var(--muted)">👥 独立客户</div></div>';
+  document.getElementById('adminStats').innerHTML=h;
+}
+function renderAdminTable(){
+  var db=getDB();
+  var search=(document.getElementById('adminSearch').value||'').toLowerCase();
+  var sort=document.getElementById('adminSort').value;
+  db=db.filter(function(r){return!search||(r.customerName||'').toLowerCase().indexOf(search)>-1||(r.rawText||'').toLowerCase().indexOf(search)>-1});
+  if(sort==='oldest')db.reverse();
+  var tbody=document.getElementById('adminTableBody');
+  if(db.length===0){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px">📭 暂无匹配记录</td></tr>';return}
+  var h='';
+  db.forEach(function(r){
+    var p=(r.rawText||'').replace(/<[^>]*>/g,'').substring(0,50);
+    var tags=(r.tags||[]).slice(0,3).map(function(t){return'<span class="a-tag">'+escHtml(t)+'</span>'}).join('');
+    h+='<tr>';
+    h+='<td style="white-space:nowrap">'+r.createdAt+'</td>';
+    h+='<td><b style="color:var(--slate)">'+escHtml(r.customerName||'未命名')+'</b></td>';
+    h+='<td style="font-size:11px">'+escHtml(r.customerInfo||'')+'</td>';
+    h+='<td class="a-preview" onclick="viewDetail(\''+r.id+'\')">'+escHtml(p)+'</td>';
+    h+='<td>'+tags+'</td>';
+    h+='<td><button class="a-btn" onclick="viewDetail(\''+r.id+'\')">查看</button><button class="a-btn" onclick="deleteOne(\''+r.id+'\')" style="color:var(--red)">删除</button></td>';
+    h+='</tr>';
+  });
+  tbody.innerHTML=h;
+}
+
+// ===== 导入导出 =====
+function exportAllDB(){
+  var db=getDB();
+  var backup={exportedAt:new Date().toISOString(),totalRecords:db.length,reviews:db};
+  var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='复盘数据备份-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  showStatus('✅ 已导出 '+db.length+' 条记录',false);
+}
+function importDB(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      var reviews=data.reviews||data;
+      if(!Array.isArray(reviews)){alert('格式错误：需要包含reviews数组');return}
+      var db=getDB();
+      var existing=new Set(db.map(function(r){return r.id}));
+      var added=0;
+      reviews.forEach(function(r){if(!existing.has(r.id)){db.push(r);added++}});
+      setDB(db);updateCounts();renderAdmin();renderHistory();
+      showStatus('✅ 导入成功：新增 '+added+' 条，去重 '+(reviews.length-added)+' 条',false);
+    }catch(e){alert('JSON解析失败：'+e.message)}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+function clearAllDB(){
+  if(!confirm('⚠️ 确定清空全部复盘数据？此操作不可恢复！\n建议先导出备份。'))return;
+  if(!confirm('再次确认：真的要删除所有 '+getDB().length+' 条记录？'))return;
+  setDB([]);updateCounts();renderAdmin();renderHistory();
+  showStatus('已清空',false);
+}
+
+// ===== UI =====
+function backToInput(){
+  document.getElementById('outputCard').style.display='none';
+  currentReport=null;currentReportHTML='';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function copyReport(){
+  var el=document.getElementById('outputBody'),txt=el.innerText;
+  navigator.clipboard.writeText(txt).then(function(){showStatus('✅ 已复制',false)}).catch(function(){alert('复制失败')});
+}
+function downloadReport(){
+  var el=document.getElementById('outputBody'),txt=el.innerText;
+  var blob=new Blob([txt],{type:'text/markdown;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='访后复盘报告.md';document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function showStatus(msg,isError){
+  var bar=document.getElementById('statusBar');bar.textContent=msg;
+  bar.className='status-bar show'+(isError?' error':'');
+  setTimeout(function(){bar.classList.remove('show')},3000);
+}
+function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ===== 分析引擎 =====
+function buildReport(txt){
+  var m='';
+  m+='<div style="font-size:15px;font-weight:700;color:var(--slate);margin:18px 0 8px;padding-left:12px;border-left:3px solid var(--purple)">📋 一、面谈概要</div>\n';
+  var profile=extractProfile(txt),themes=extractThemes(txt);
+  m+='<div style="background:#F7F9FC;padding:14px 18px;border-radius:10px;margin-bottom:16px">\n';
+  m+='<h3 style="font-size:14px;margin-bottom:6px">👤 客户速写</h3><p style="font-size:13px;margin-bottom:10px">'+profile+'</p>';
+  m+='<h3 style="font-size:14px;margin-bottom:6px">💬 讨论主题</h3><p style="font-size:13px">'+themes+'</p></div>\n\n';
+
+  m+='<div style="font-size:15px;font-weight:700;color:var(--slate);margin:18px 0 8px;padding-left:12px;border-left:3px solid var(--purple)">🔍 二、异议回溯 & 处理框架评分</div>\n';
+  var objs=extractObjections(txt);
+  if(objs.length===0){m+='<p style="color:var(--muted);font-size:13px">未检测到明确异议。</p>\n'}
+  else{
+    objs.forEach(function(obj,i){
+      m+='<div style="background:#FAFBFC;border:1px solid var(--border);padding:14px;border-radius:10px;margin-bottom:12px">\n';
+      m+='<div style="font-weight:600;margin-bottom:8px;color:var(--slate)">异议 '+(i+1)+'：'+obj.text+'</div>\n';
+      var scores=rateFiveSteps(obj,txt),steps=['接住','探知','重构','引导','金句'],tips=[];
+      scores.forEach(function(s,j){
+        var color=s>=2?'var(--green)':s>=1?'var(--amber)':'var(--red)';
+        var text=s>=2?'到位 ✓':s>=1?'部分到位':'缺失 ✗';
+        m+='<div style="font-size:12px;margin:3px 0"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+color+';margin-right:6px"></span><strong>'+steps[j]+'</strong>：<span style="color:'+color+'">'+text+'</span></div>';
+        if(s<2)tips.push(getStepTip(j));
+      });
+      if(tips.length>0){m+='<div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><strong style="color:var(--purple)">💡 改进建议：</strong><br>';tips.forEach(function(t,i){m+='<span style="display:block;margin:2px 0;padding-left:10px;border-left:2px solid var(--purple)">'+(i+1)+'. '+t+'</span>'});m+='</div>'}
+      m+='<div style="font-size:12px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)"><strong style="color:var(--green)">🔄 参考话术：</strong><br>';
+      m+='<span style="display:block;margin-left:8px;color:var(--muted)"><b>接住：</b>'+genAltResponse(obj.text,'catch')+'</span>';
+      m+='<span style="display:block;margin-left:8px;color:var(--muted)"><b>探知：</b>'+genAltResponse(obj.text,'probe')+'</span>';
+      m+='<span style="display:block;margin-left:8px;color:var(--muted)"><b>重构：</b>'+genAltResponse(obj.text,'reframe')+'</span>';
+      m+='<span style="display:block;margin-left:8px;color:var(--muted)"><b>引导：</b>'+genAltResponse(obj.text,'guide')+'</span>';
+      m+='<span style="display:block;margin-left:8px;color:var(--green)"><b>金句：</b>'+genAltResponse(obj.text,'punch')+'</span>';
+      m+='</div></div>\n\n';
+    });
+  }
+
+  m+='<div style="font-size:15px;font-weight:700;color:var(--slate);margin:18px 0 8px;padding-left:12px;border-left:3px solid var(--purple)">⚠️ 三、遗漏需求检测</div>\n';
+  var gaps=detectGaps(txt,profile);
+  if(gaps.length===0){m+='<p style="color:var(--muted);font-size:13px">未发现明显遗漏</p>\n'}
+  else{gaps.forEach(function(g){m+='<div style="background:#FFF8F0;border:1px solid #FED7AA;padding:12px 16px;border-radius:8px;margin-bottom:10px"><div style="font-weight:600;color:var(--amber)">'+g.title+'</div><p style="font-size:13px;margin-top:4px">'+g.desc+'</p></div>\n'})}
+
+  m+='<div style="font-size:15px;font-weight:700;color:var(--slate);margin:18px 0 8px;padding-left:12px;border-left:3px solid var(--purple)">🎭 四、情绪节点分析</div>\n';
+  var emotions=extractEmotions(txt);
+  if(emotions.length===0){m+='<p style="color:var(--muted);font-size:13px">未描述情绪变化</p>\n'}
+  else{emotions.forEach(function(em){m+='<div style="background:#F0F7F9;border:1px solid #B2D8E0;padding:12px 16px;border-radius:8px;margin-bottom:10px"><div style="font-weight:600">'+em.label+'</div><p style="font-size:13px;margin-top:4px">'+em.desc+'</p></div>\n'})}
+
+  m+='<div style="font-size:15px;font-weight:700;color:var(--slate);margin:18px 0 8px;padding-left:12px;border-left:3px solid var(--purple)">🎯 五、下次行动方案</div>\n';
+  var actions=genNextActions(txt,profile,gaps);
+  actions.forEach(function(a,i){m+='<div style="background:#FAFBFC;border:1px solid var(--border);padding:12px 16px;border-radius:8px;margin-bottom:10px"><div style="font-weight:600;color:var(--slate)">'+(i+1)+'. '+a.title+'</div><p style="font-size:13px;margin-top:4px">'+a.desc+'</p></div>\n'});
+
+  var quotes=['复盘的深度，决定下次面谈的高度。','高手不是不犯错，是同样的错不犯第二次。','客户的拒绝是路标，不是终点。','每一次复盘，都是在给自己的专业能力充值。'];
+  m+='<div style="background:linear-gradient(135deg,#F0EBF8,#EDE4F5);padding:16px;border-radius:10px;margin-top:20px;text-align:center;font-size:15px;font-weight:600;color:var(--purple)">💡 '+quotes[Math.floor(Math.random()*quotes.length)]+'</div>\n';
+  m+='\n<p style="font-size:11px;color:var(--muted);margin-top:16px;text-align:center">由访后复盘引擎 V3.0 生成</p>';
+  return m;
+}
+
+function extractProfile(txt){
+  var parts=[];
+  var m=txt.match(/(\d{2,3})\s*岁/);if(m)parts.push(m[1]+'岁');
+  if(txt.indexOf('男')>-1)parts.push('男性');else if(txt.indexOf('女')>-1)parts.push('女性');
+  m=txt.match(/职业[：:是为]*(\S{2,6})/);if(!m)m=txt.match(/(企业中层|高管|个体户|公务员|教师|医生|工程师|自由职业|退休|老板|企业家|经理)/);if(m)parts.push(m[1]);
+  m=txt.match(/收入[^\d]*(\d+)/);if(m)parts.push('年收入约'+m[1]+'万');
+  if(txt.indexOf('已婚')>-1)parts.push('已婚');if(txt.indexOf('有孩子')>-1||txt.indexOf('子女')>-1||txt.indexOf('小孩')>-1)parts.push('有子女');if(txt.indexOf('单身')>-1)parts.push('单身');
+  return parts.length?parts.join(' · '):'未明确描述';
+}
+function extractThemes(txt){
+  var themes=[],kw={yanglao:'养老规划',jiaoyu:'子女教育',jiankang:'健康保障',zichan:'资产配置',chuancheng:'传承规划',shuiwu:'税务筹划',baozhang:'保障补缺',jiabao:'加保升级',jiayi:'家医服务'};
+  for(var k in kw){if(txt.indexOf(k)>-1||txt.indexOf(kw[k])>-1)themes.push(kw[k])}
+  return themes.length?[...new Set(themes)].join('、'):'未明确识别';
+}
+function extractObjections(txt){
+  var objs=[],seen={};
+  var patterns=[/异议[：:是]*"([^"]+)"/,/异议[：:是]*「([^」]+)」/,/异议[：:是]*([^。\n]{5,40})/g,/客户[说认为觉得][：:]*"([^"]+)"/,/客户[说认为觉得][：:]*([^。\n]{5,40})/g,/提出[了]?[：:]*"([^"]+)"/,/担心[：:是]*"([^"]+)"/,/顾虑[：:是]*"([^"]+)"/,/觉得[：:]*"([^"]+)"[^。]*不[合对行划]/,/说[：:]*"([^"]+)"[^。]*(?:不|没)/];
+  patterns.forEach(function(p){var m;while((m=p.exec(txt))!==null){var t=(m[1]||m[0]).replace(/[""「」]/g,'').trim();if(t.length>3&&t.length<50&&!seen[t]){objs.push({text:t});seen[t]=true}}});
+  if(objs.length===0){var negs=[/觉得[^。\n]{4,30}[不高低少差亏]/g,/说[^。\n]{4,30}(?:不|没)[^。\n]{2,20}/g,/但是[^。\n]{5,30}/g];negs.forEach(function(p){var m;while((m=p.exec(txt))!==null){var t=m[0].trim();if(t.length>4&&t.length<45&&!seen[t]){objs.push({text:t});seen[t]=true}}})}
+  return objs.slice(0,4);
+}
+function rateFiveSteps(obj,txt){
+  var scores=[0,0,0,0,0],idx=txt.indexOf(obj.text);if(idx===-1)return scores;
+  var after=txt.substring(idx+obj.text.length,idx+obj.text.length+500);
+  if(after.match(/理解|认同|确实|说得对|正常|不奇怪/))scores[0]=2;else if(after.match(/嗯|是的|好的/))scores[0]=1;
+  if(after.match(/为什么|怎么想|有没有|什么时候|多少|具体/))scores[1]=2;else if(after.match(/是吗|对吧|\?|？/))scores[1]=1;
+  if(after.match(/换个角度|其实|不是[^。]而是|你想想|举个例子|好比/))scores[2]=2;else if(after.match(/所以|因为|关键是/))scores[2]=1;
+  if(after.match(/你觉得|你说呢|你怎么看|对吗|合理吗|选哪个|愿意吗/))scores[3]=2;else if(after.match(/要不|如果|假设/))scores[3]=1;
+  if(after.match(/最好的[^。\n]{4,20}/)||after.match(/真正[^。\n]{4,20}/)||after.match(/最[^。\n]{2,15}是[^。\n]{3,20}/))scores[4]=2;else if(after.match(/总结|一句话|记住/))scores[4]=1;
+  return scores;
+}
+function getStepTip(idx){
+  return ['先认可感受再探知——"我理解您这么想，方便问一下具体因为什么？"','追问"为什么这么想？"来挖掘真实顾虑','类比换角度——"好比车险，不出险时觉得不划算但不会不买"','用选择题引导——"如果A管眼前B管长远，你更担心哪个？"','留一句可记住的话——"赚钱靠能力，守钱靠制度"'][idx];
+}
+function genAltResponse(objText,step){
+  var t=objText.toLowerCase();
+  var isShouyi=t.indexOf('收益')>-1||t.indexOf('回报')>-1||t.indexOf('低')>-1||t.indexOf('不划算')>-1;
+  var isGoule=t.indexOf('够了')>-1||t.indexOf('买过')>-1||t.indexOf('已有')>-1;
+  var isMeiqian=t.indexOf('没钱')>-1||t.indexOf('太贵')>-1||t.indexOf('紧张')>-1;
+  var isNianqing=t.indexOf('年轻')>-1||t.indexOf('健康')>-1||t.indexOf('身体好')>-1;
+  if(isShouyi){switch(step){case'catch':return'您关注收益是对的，每一分钱都应该有效率——我完全同意。';case'probe':return'您买过理财有没有踩过坑的？对收益的期待是"跑赢通胀"还是"绝对不能亏"？';case'reframe':return'不是收益高低的问��——是你的钱分没分工。有的负责进攻，有的负责防守。保单是防守端的。';case'guide':return'如果有两个账户——一个波动大，一个确定增长——各占多少比例合适？';case'punch':return'赚钱靠能力，守钱靠制度。会赚钱的人很多，把守住的人没几个。'}}
+  if(isGoule){switch(step){case'catch':return'太好了，您买过保险说明早有保障意识。';case'probe':return'方便问一下当初买的目的和额度？现在回头看够用吗？';case'reframe':return'买保险跟买车不一样——不是"有就行"。保障需要跟收入、责任一起成长。';case'guide':return'花几分钟帮您梳理现有保单？不买没关系，知道差哪块心里有数。';case'punch':return'买保险不是有没有的问题——是够不够的问题。'}}
+  if(isMeiqian){switch(step){case'catch':return'我理解，现在谁都觉得钱不够用。';case'probe':return'"没钱"是真的连基本生活都困难，还是觉得保险的优先级排在消费后面？';case'reframe':return'第一年保费是挤出来的，第二年省出来的，第三年就习惯了。';case'guide':return'一天少喝一杯奶茶，一年存一两万，二十年后变几十万——你愿意试试吗？';case'punch':return'不是有钱才规划——是规划了才有钱。'}}
+  if(isNianqing){switch(step){case'catch':return'年轻身体好是真的好，我一点都不怀疑。';case'probe':return'身边有没有三四十岁的朋友突然查出什么问题的？';case'reframe':return'买保险不是因为你已经有问题——恰恰因为你没问题。出问题了，门就关了。';case'guide':return'30岁买比45岁便宜一半——这便宜你不占？';case'punch':return'身体健康的人才有资格买保险。最好时间是十年前，其次是现在。'}}
+  switch(step){case'catch':return objText+'——这个问题问得很好。';case'probe':return'您这么想，方便说一下是什么经历或听谁说了什么吗？';case'reframe':return'保险不是消费品，它是你财务体系里的安全网。平时感觉不到，关键时刻能救命。';case'guide':return'如果有一个办法能解决您这个顾虑，愿意花几分钟了解一下吗？';case'punch':return'很多事情不是因为看懂了才行动——是因为行动了才能看懂。'}
+}
+function detectGaps(txt,profile){
+  var gaps=[],hasYanglao=txt.indexOf('养老')>-1,hasJiaoyu=txt.indexOf('教育')>-1||txt.indexOf('孩子')>-1;
+  var hasJiankang=txt.indexOf('健康')>-1||txt.indexOf('医疗')>-1||txt.indexOf('重疾')>-1;
+  var hasChuancheng=txt.indexOf('传承')>-1||txt.indexOf('继承')>-1;
+  var hasHunyin=txt.indexOf('婚姻')>-1||txt.indexOf('婚变')>-1||txt.indexOf('离婚')>-1;
+  var hasFangchan=txt.indexOf('房子')>-1||txt.indexOf('房产')>-1;
+  var hasJiaqi=txt.indexOf('企业')>-1||txt.indexOf('公司')>-1||txt.indexOf('债务')>-1;
+  var ageMatch=txt.match(/(\d{2,3})\s*岁/),age=ageMatch?parseInt(ageMatch[1]):0;
+  if(age>=35&&age<=50&&!hasYanglao)gaps.push({title:'养老规划缺口',desc:'客户'+age+'岁，正值养老黄金窗口。建议下次用"退休后想过什么样的生活？"切入。'});
+  if(txt.indexOf('有孩子')>-1&&!hasJiaoyu)gaps.push({title:'教育金缺口',desc:'客户有子女未讨论教育金。教育是确定性支出，应用确定性工具匹配。'});
+  if(!hasJiankang)gaps.push({title:'健康保障缺口',desc:'未涉及健康/医疗保障。重疾和医疗是家庭资产安全垫。'});
+  if(profile.indexOf('企业')>-1&&!hasJiaqi)gaps.push({title:'家企隔离风险',desc:'推测为企业相关职业，未讨论家企风险隔离。'});
+  if(txt.indexOf('已婚')>-1&&!hasHunyin)gaps.push({title:'婚姻财产保护',desc:'已婚未讨论婚姻财产保护。《民法典婚姻家庭编解释(二)》后需关注。'});
+  if(hasFangchan&&!hasChuancheng)gaps.push({title:'房产传承隐患',desc:'提到房产未讨论传承。问"打算怎么安全地传给孩子？"'});
+  return gaps.slice(0,4);
+}
+function extractEmotions(txt){
+  var ems=[];
+  if(txt.match(/犹豫|迟疑|想了[很久一会]|沉默/))ems.push({label:'🤔 犹豫/迟疑',desc:'客户表现出犹豫。建议不要催，用"不着急，慢慢想"卸掉压力。'});
+  if(txt.match(/皱眉|不满|反感|不耐烦|打断/))ems.push({label:'😤 抵触信号',desc:'表现出抵触——切入太硬或踩到敏感点。下次先绕开聊轻松的。'});
+  if(txt.match(/眼睛[一]?亮|感兴趣|追问|主动问|[很挺]感兴趣/))ems.push({label:'✨ 兴趣信号',desc:'表现出兴趣——突破口。下次直接从这个话题切入。'});
+  if(txt.match(/叹气|无奈|没办法|认命/))ems.push({label:'😔 无力感',desc:'对未来的无力感——需要被赋能。用"其实已经有办法了"开启新框架。'});
+  if(txt.match(/反复[说到问]|纠结|来回/))ems.push({label:'🔄 纠结中',desc:'在意但下不了决心。用对比图表+数字可视化利弊。'});
+  return ems.slice(0,3);
+}
+function genNextActions(txt,profile,gaps){
+  var acts=[];
+  if(gaps.length>0)acts.push({title:'补上遗漏话题',desc:'未覆盖：'+gaps.map(function(g){return g.title}).join('、')+'。以"上次聊完我又想到一个点"切入。'});
+  var tm=txt.match(/(\d+)天|下周|明天|这周|近期/);
+  if(tm)acts.push({title:'时间节点跟进',desc:'建议在'+tm[0]+'内完成下一次接触。'});
+  else acts.push({title:'48小时发送跟进',desc:'面谈后48小时是黄金窗口。不推产品，只发相关案例或文章保存在感。'});
+  acts.push({title:'交叉验证作战计划',desc:'将客户画像输入展业小助手V1.2，生成新作战计划做对比参考。'});
+  if(txt.match(/下次|[再继]续|第二[次轮]/))acts.push({title:'准备预判异议',desc:'提前准备3-5个结构���处理话术。客户第二次见面往往提出更深顾虑。'});
+  return acts.slice(0,5);
+}
+
+// ===== 知识库检索与报告富化 =====
+
+// 从复盘文本中提取知识库搜索关键词
+function extractTopicsForKB(txt){
+  var topics=[];
+  if(txt.indexOf('养老')>-1||txt.indexOf('退休')>-1||txt.indexOf('年金')>-1)topics.push('养老');
+  if(txt.indexOf('教育')>-1||txt.indexOf('子女')>-1||txt.indexOf('孩子')>-1||txt.indexOf('上学')>-1)topics.push('教育');
+  if(txt.indexOf('健康')>-1||txt.indexOf('医疗')>-1||txt.indexOf('重疾')>-1||txt.indexOf('大病')>-1)topics.push('健康');
+  if(txt.indexOf('传承')>-1||txt.indexOf('继承')>-1||txt.indexOf('遗产')>-1||txt.indexOf('受益人')>-1)topics.push('传承');
+  if(txt.indexOf('婚姻')>-1||txt.indexOf('离婚')>-1||txt.indexOf('夫妻')>-1||txt.indexOf('婚内')>-1)topics.push('婚姻');
+  if(txt.indexOf('企业')>-1||txt.indexOf('公司')>-1||txt.indexOf('债务')>-1||txt.indexOf('隔离')>-1)topics.push('企业');
+  if(txt.indexOf('房产')>-1||txt.indexOf('房子')>-1||txt.indexOf('房屋')>-1)topics.push('房产');
+  if(txt.indexOf('社保')>-1||txt.indexOf('医保')>-1||txt.indexOf('养老金')>-1)topics.push('社保');
+  if(txt.indexOf('纠纷')>-1||txt.indexOf('理赔')>-1||txt.indexOf('拒赔')>-1||txt.indexOf('诉讼')>-1)topics.push('纠纷');
+  if(txt.indexOf('收益')>-1||txt.indexOf('回报')>-1||txt.indexOf('利率')>-1||txt.indexOf('分红')>-1)topics.push('产品');
+  if(txt.indexOf('法律')>-1||txt.indexOf('法条')>-1||txt.indexOf('民法典')>-1||txt.indexOf('保险法')>-1||txt.indexOf('司法解释')>-1)topics.push('法律');
+  if(txt.indexOf('跨境')>-1||txt.indexOf('香港')>-1||txt.indexOf('境外')>-1||txt.indexOf('外币')>-1)topics.push('跨境');
+  if(txt.indexOf('话术')>-1||txt.indexOf('切入')>-1||txt.indexOf('沟通')>-1||txt.indexOf('异议')>-1)topics.push('话术');
+  if(txt.indexOf('没钱')>-1||txt.indexOf('太贵')>-1||txt.indexOf('预算')>-1||txt.indexOf('紧张')>-1)topics.push('保险认知');
+  if(txt.indexOf('案例')>-1||txt.indexOf('故事')>-1||txt.indexOf('经历')>-1)topics.push('纠纷案例');
+  // 去重
+  var seen={},result=[];
+  topics.forEach(function(t){if(!seen[t]){seen[t]=true;result.push(t)}});
+  return result.slice(0,8);
+}
+
+// 加载本地知识库索引
+function loadKBIndex(){
+  fetch('kb-index.json?v='+Date.now())
+    .then(function(res){return res.json()})
+    .then(function(data){
+      kbItems=data.items||[];
+      kbLoaded=true;
+      console.log('知识库已加载：'+kbItems.length+' 篇');
+    })
+    .catch(function(e){
+      console.warn('知识库索引加载失败:',e);
+    });
+}
+
+// 本地知识库搜索（纯前端，不依赖后端）
+function searchIndex(keyword, maxResults){
+  maxResults=maxResults||15;
+  keyword=keyword.toLowerCase().trim();
+  if(!keyword||!kbItems.length)return[];
+
+  var scored=[];
+  kbItems.forEach(function(entry){
+    var score=0;
+    var catMatch=entry.category.toLowerCase().indexOf(keyword)>-1;
+    var titleMatch=entry.title.toLowerCase().indexOf(keyword)>-1;
+    var snippetMatch=entry.snippet.toLowerCase().indexOf(keyword)>-1;
+    var contentMatch=entry.fullContent.toLowerCase().indexOf(keyword)>-1;
+
+    if(titleMatch)score+=10;
+    if(catMatch)score+=5;
+    if(snippetMatch)score+=3;
+    if(contentMatch)score+=1;
+
+    if(score>0){
+      var snippet=snippetMatch?extractSnippetAround(entry.snippet,keyword):entry.snippet.substring(0,120);
+      scored.push({
+        score:score,
+        path:entry.path,
+        category:entry.category,
+        title:entry.title,
+        snippet:snippet,
+        topic:''
+      });
+    }
+  });
+
+  scored.sort(function(a,b){return b.score-a.score});
+  return scored.slice(0,maxResults);
+}
+
+function extractSnippetAround(text,keyword){
+  var idx=text.toLowerCase().indexOf(keyword);
+  if(idx===-1)return text.substring(0,120);
+  var start=Math.max(0,idx-40);
+  var end=Math.min(text.length,idx+keyword.length+80);
+  return(start>0?'...':'')+text.substring(start,end)+(end<text.length?'...':'');
+}
+
+// 异步搜索知识库（改为本地检索）
+async function searchKBForTopics(txt){
+  var topics=extractTopicsForKB(txt);
+  var allResults=[];
+  var seen={};
+
+  topics.forEach(function(topic){
+    var results=searchIndex(topic,10);
+    results.forEach(function(r){
+      if(!seen[r.path]){
+        seen[r.path]=true;
+        r.topic=topic;
+        allResults.push(r);
+      }
+    });
+  });
+
+  return allResults;
+}
+
+// 知识库话题中文映射
+var TOPIC_NAMES={
+  '养老':'养老规划','教育':'子女教育','健康':'健康保障',
+  '传承':'财富传承','婚姻':'婚姻财产','企业':'家企隔离',
+  '房产':'房产传承','社保':'社保科普','纠纷':'纠纷案例',
+  '产品':'产品知识','法律':'法律法条','跨境':'港险跨境',
+  '保险认知':'保险认知','话术':'销售心法','纠纷案例':'纠纷案例'
+};
+
+// 富化报告：插入知识库参考建议板块
+function enrichWithKB(reportHTML,kbResults,txt){
+  // 没结果——显示提示但不破坏报告
+  if(!kbResults||kbResults.length===0){
+    var noResultBlock='<div style="margin-top:20px;padding:16px;background:#FFF8F0;border:1px solid #FED7AA;border-radius:10px">'+
+      '<div style="font-size:14px;font-weight:700;color:var(--amber);margin-bottom:8px">📚 知识库参考建议</div>'+
+      '<p style="font-size:13px;color:var(--muted)">⚠️ 本次未检索到匹配的知识库文章。</p>'+
+      '<p style="font-size:12px;color:var(--muted)">提示：kb-index.json 可能未加载或当前复盘话题知识库覆盖不足。</p></div>';
+    var ftr='<p style="font-size:11px;color:var(--muted);margin-top:16px;text-align:center">';
+    var idx=reportHTML.lastIndexOf(ftr);
+    return idx>-1?reportHTML.substring(0,idx)+noResultBlock+'\n\n'+reportHTML.substring(idx):reportHTML+noResultBlock;
+  }
+
+  // 按topic分组
+  var byTopic={};
+  kbResults.forEach(function(r){
+    var t=r.topic||'其他';
+    if(!byTopic[t])byTopic[t]=[];
+    if(byTopic[t].length<5)byTopic[t].push(r);
+  });
+
+  // 构建参考建议板块HTML
+  var refHtml='<div style="margin-top:24px;padding:20px;background:var(--card);border:2px solid var(--border);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.04)">';
+  refHtml+='<div style="font-size:16px;font-weight:700;color:var(--slate);margin-bottom:4px;display:flex;align-items:center;gap:8px">📚 知识库参考建议</div>';
+  refHtml+='<p style="font-size:12px;color:var(--muted);margin-bottom:16px">基于复盘内容为您推荐以下知识库文章，方便下次面谈前做知识储备</p>';
+
+  var topicKeys=Object.keys(byTopic);
+  topicKeys.forEach(function(topic){
+    var displayName=TOPIC_NAMES[topic]||topic;
+    var entries=byTopic[topic];
+    refHtml+='<div style="margin-bottom:14px">';
+    refHtml+='<div style="font-size:14px;font-weight:600;color:var(--purple);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">📖 '+displayName+'（'+entries.length+'篇）</div>';
+    entries.forEach(function(e){
+      var catName=(e.category||'').replace(/[/\\]/g,' · ');
+      refHtml+='<div style="background:#FAFBFC;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px;transition:all .1s" onmouseover="this.style.borderColor=\'var(--purple)\'" onmouseout="this.style.borderColor=\'var(--border)\'">';
+      refHtml+='<div style="font-size:13px;font-weight:600;color:var(--slate)">'+escHtml(e.title)+'</div>';
+      refHtml+='<div style="font-size:11px;color:var(--muted);margin:2px 0">📂 <strong>'+escHtml(catName)+'</strong></div>';
+      if(e.snippet&&e.snippet.length>0){
+        refHtml+='<div style="font-size:12px;color:var(--text);margin-top:4px;line-height:1.6;overflow:hidden;text-overflow:ellipsis">'+escHtml(e.snippet)+'</div>';
+      }
+      refHtml+='</div>';
+    });
+    refHtml+='</div>';
+  });
+
+  // 延伸行动建议
+  refHtml+='<div style="margin-top:12px;padding:14px;background:#F0EBF8;border-radius:10px">';
+  refHtml+='<div style="font-size:13px;font-weight:600;color:var(--purple);margin-bottom:8px">💡 基于知识库的延伸行动建议</div>';
+  refHtml+='<ul style="font-size:13px;line-height:2;padding-left:20px;margin:0">';
+
+  // 根据话题生成建议
+  var suggestions=[];
+  topicKeys.forEach(function(topic){
+    var name=TOPIC_NAMES[topic]||topic;
+    suggestions.push('下次面谈前，建议先阅读上方的「'+name+'」相关文章，做好知识储备');
+  });
+  suggestions.push('将本次复盘中识别到的异议类型整理成个人常用话术卡，定期复习内化');
+  suggestions.push('结合「异议处理五步法」反复练习薄弱环节，每次复盘对比前次进步');
+
+  // 去重
+  var seenSugg={};
+  suggestions.forEach(function(s){
+    if(!seenSugg[s]){seenSugg[s]=true;refHtml+='<li style="margin-bottom:2px">'+s+'</li>'}
+  });
+  refHtml+='</ul></div></div>';
+
+  // 在报告底部（页脚之前）插入参考建议
+  var footerMarker='<p style="font-size:11px;color:var(--muted);margin-top:16px;text-align:center">';
+  var insertionPoint=reportHTML.lastIndexOf(footerMarker);
+  if(insertionPoint>-1){
+    return reportHTML.substring(0,insertionPoint)+refHtml+'\n\n'+reportHTML.substring(insertionPoint);
+  }
+  return reportHTML+refHtml;
+}
+</script>
+</body>
+</html>
