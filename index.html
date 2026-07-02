@@ -154,7 +154,7 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
 <div class="header">
   <div class="header-left">
     <h1>访后复盘引擎 V3.0</h1>
-    <p>记录 · 分析 · 成长 — 每次复盘都看得见</p>
+    <p onclick="openAdminPanel()" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px">记录 · 分析 · 成长 — 每次复盘都看得见</p>
   </div>
   <div class="header-right">
     <input class="customer-input" id="customerName" placeholder="客户姓名(必填)" onchange="persistCustomerName()">
@@ -166,7 +166,6 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
 <div class="nav-tabs">
   <div class="nav-tab active" onclick="switchMainTab('review')">📝 新建复盘</div>
   <div class="nav-tab" onclick="switchMainTab('history')">📚 历史记录 <span class="count" id="historyCount">0</span></div>
-  <div class="nav-tab" onclick="switchMainTab('admin')">🔐 开发者后台</div>
 </div>
 
 <!-- ===== 新建复盘 ===== -->
@@ -226,29 +225,23 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
   </div>
 </div>
 
-<!-- ===== 开发者后台 ===== -->
-<div class="card history-panel" id="adminPanel" style="border-radius:0 0 16px 16px">
-  <div class="admin-banner">
-    <div><h3>🔐 开发者后台</h3><span style="font-size:11px;opacity:.7">本地数据库 · 所有用户记录</span></div>
-    <div class="admin-btns">
-      <button onclick="exportAllDB()">📥 导出JSON备份</button>
-      <button onclick="document.getElementById('importFile').click()">📤 导入JSON备份</button>
-      <button onclick="clearAllDB()" style="border-color:rgba(255,100,100,.5)">🗑 清空数据库</button>
+<!-- ===== 追问区域（仅在完成分析后显示） ===== -->
+<div id="followUpSection" style="display:none">
+  <div style="background:var(--card);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.03);overflow:hidden;margin-top:24px">
+    <div class="output-header" style="background:var(--purple)">
+      <h2>💬 追问 · 深入洞察</h2>
+      <div class="actions">
+        <button onclick="scrollToOutput()">⬆ 回到报告</button>
+      </div>
     </div>
-  </div>
-  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importDB(this)">
-  <div id="adminStats" style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap"></div>
-  <div class="history-filter">
-    <input type="text" id="adminSearch" placeholder="🔍 搜索..." oninput="renderAdminTable()">
-    <select id="adminSort" onchange="renderAdminTable()">
-      <option value="newest">最新在前</option><option value="oldest">最早在前</option>
-    </select>
-  </div>
-  <div class="admin-table-wrap">
-    <table class="admin-table">
-      <thead><tr><th>时间</th><th>客户</th><th>画像</th><th>预览</th><th>标签</th><th>操作</th></tr></thead>
-      <tbody id="adminTableBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">📭 暂无数据</td></tr></tbody>
-    </table>
+    <div id="followUpThread" style="padding:20px 22px;max-height:50vh;overflow-y:auto;font-size:14px"></div>
+    <div style="padding:16px 22px 20px;border-top:1px solid var(--border);background:#FBF9FA">
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <textarea id="followUpInput" placeholder="输入追问，如：客户真实顾虑是什么？下次我该怎么说？深入分析一下..." style="flex:1;min-height:52px;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;line-height:1.6;resize:vertical;outline:none;background:#fff" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendFollowUp()}"></textarea>
+        <button onclick="sendFollowUp()" style="padding:10px 24px;background:var(--purple);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;height:52px">发送 ➤</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">支持 Enter 发送，Shift+Enter 换行</div>
+    </div>
   </div>
 </div>
 
@@ -334,19 +327,11 @@ function switchMainTab(tab){
     document.querySelectorAll('.nav-tab')[0].classList.add('active');
     document.getElementById('reviewPanel').style.display='block';
     document.getElementById('historyPanel').classList.remove('active');
-    document.getElementById('adminPanel').classList.remove('active');
-  }else if(tab==='history'){
+  }else{
     document.querySelectorAll('.nav-tab')[1].classList.add('active');
     document.getElementById('reviewPanel').style.display='none';
     document.getElementById('historyPanel').classList.add('active');
-    document.getElementById('adminPanel').classList.remove('active');
     renderHistory();
-  }else{
-    document.querySelectorAll('.nav-tab')[2].classList.add('active');
-    document.getElementById('reviewPanel').style.display='none';
-    document.getElementById('historyPanel').classList.remove('active');
-    document.getElementById('adminPanel').classList.add('active');
-    renderAdmin();
   }
 }
 function switchTab(tab){
@@ -452,7 +437,10 @@ function analyzeReview(){
 
     // Step 1: 生成核心分析报告
     currentReportHTML=buildReport(txt);
-    currentReport={customerName:cname,customerInfo:extractProfile(txt),rawText:txt,tags:extractThemes(txt).split('、').filter(Boolean)};
+    var now=formatNow();
+    currentReport={customerName:cname,customerInfo:extractProfile(txt),rawText:txt,tags:extractThemes(txt).split('、').filter(Boolean),createdAt:now,
+      _rounds:[{round:1,type:'initial',rawText:txt,analysis:currentReportHTML,timestamp:now}]
+    };
 
     // Step 2: 检索知识库（同步，本地内存检索）
     var kbResults=searchKBForTopics(txt);
@@ -461,10 +449,18 @@ function analyzeReview(){
     var enrichedHTML=enrichWithKB(currentReportHTML,kbResults,txt);
     currentReportHTML=enrichedHTML;
     currentReport.analysis=enrichedHTML;
+    currentReport._rounds[0].analysis=enrichedHTML;
 
     document.getElementById('outputBody').innerHTML=enrichedHTML;
     document.getElementById('outputCard').style.display='block';
     btn.disabled=false;btn.textContent='🔍 开始分析';
+
+    // 显示追问区域，重置追问线程
+    document.getElementById('followUpSection').style.display='block';
+    document.getElementById('followUpThread').innerHTML='';
+    document.getElementById('followUpInput').value='';
+    setTimeout(function(){document.getElementById('followUpInput').focus()},300);
+
     window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){
     document.getElementById('analyzeBtn').disabled=false;
@@ -477,6 +473,12 @@ function analyzeReview(){
 function saveToLocal(){
   if(!currentReport){alert('请先完成复盘分析');return}
   var db=getDB();
+  var now=formatNow();
+  // 构建rounds：如果没有rounds数组，创建初始轮
+  var rounds=currentReport._rounds||[];
+  if(rounds.length===0){
+    rounds.push({round:1,type:'initial',rawText:currentReport.rawText,analysis:currentReportHTML,timestamp:now});
+  }
   db.push({
     id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     customerName:currentReport.customerName,
@@ -484,12 +486,19 @@ function saveToLocal(){
     rawText:currentReport.rawText,
     analysis:currentReportHTML,
     tags:currentReport.tags,
-    createdAt:new Date().toISOString().slice(0,19).replace('T',' ')
+    rounds:rounds,
+    createdAt:now,
+    updatedAt:now
   });
   setDB(db);updateCounts();
-  showStatus('✅ 已保存！共'+db.length+'条记录',false);
+  var rCount=rounds.length;
+  showStatus('✅ 已保存！共'+db.length+'条记录'+(rCount>1?'，'+rCount+'轮追问':''),false);
   currentReport=null;currentReportHTML='';
   document.getElementById('outputCard').style.display='none';
+  document.getElementById('followUpSection').style.display='none';
+}
+function formatNow(){
+  return new Date().toISOString().slice(0,19).replace('T',' ');
 }
 
 // ===== 历史 =====
@@ -521,60 +530,37 @@ function viewDetail(id){
   var r=getDB().find(function(x){return x.id===id});
   if(!r)return;
   document.getElementById('modalTitle').textContent='复盘详情：'+r.customerName+' | '+r.createdAt;
-  document.getElementById('modalBody').innerHTML=r.analysis||'<p>暂无分析</p>';
+  // 支持多轮次展示
+  var html='';
+  if(r.rounds&&r.rounds.length>0){
+    r.rounds.forEach(function(round,i){
+      var isInitial=round.type==='initial';
+      html+='<div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+      html+='<div style="background:'+(isInitial?'var(--slate)':'var(--purple)')+';color:#fff;padding:8px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center">';
+      html+='<span><b>'+(isInitial?'📋 初始复盘':'💬 第'+i+'轮追问')+'</b></span>';
+      html+='<span style="opacity:.7;font-size:11px">'+round.timestamp+'</span>';
+      if(!isInitial) html+='<span style="font-size:11px;opacity:.8;margin-left:8px">问：'+escHtml(round.question||'')+'</span>';
+      html+='</div>';
+      html+='<div style="padding:14px;font-size:13px;line-height:1.7">'+(round.analysis||'<p style="color:var(--muted)">暂无分析</p>')+'</div>';
+      html+='</div>';
+    });
+  }else if(r.analysis){
+    html=r.analysis;
+  }else{
+    html='<p style="color:var(--muted)">暂无分析内容</p><pre style="white-space:pre-wrap;font-size:12px;margin-top:12px;background:#F7F9FC;padding:12px;border-radius:8px">'+escHtml(r.rawText||'')+'</pre>';
+  }
+  document.getElementById('modalBody').innerHTML=html;
   document.getElementById('detailModal').classList.add('show');
 }
 function closeModal(){document.getElementById('detailModal').classList.remove('show')}
 function deleteOne(id){
   if(!confirm('确定删除此条复盘？'))return;
   setDB(getDB().filter(function(r){return r.id!==id}));
-  updateCounts();renderHistory();renderAdmin();
+  updateCounts();renderHistory();
   showStatus('已删除',false);
 }
 
-// ===== 管理员后台 =====
-function renderAdmin(){
-  renderAdminStats();
-  renderAdminTable();
-}
-function renderAdminStats(){
-  var db=getDB();
-  var now=new Date();
-  var weekAgo=new Date(now-7*24*60*60*1000).toISOString().slice(0,10);
-  var monthAgo=new Date(now-30*24*60*60*1000).toISOString().slice(0,10);
-  var customers=[...new Set(db.map(function(r){return r.customerName}))];
-  var h='';
-  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--slate)">'+db.length+'</div><div style="font-size:11px;color:var(--muted)">📊 总记录</div></div>';
-  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--purple)">'+db.filter(function(r){return r.createdAt>=weekAgo}).length+'</div><div style="font-size:11px;color:var(--muted)">📅 本周</div></div>';
-  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--teal)">'+db.filter(function(r){return r.createdAt>=monthAgo}).length+'</div><div style="font-size:11px;color:var(--muted)">📆 本月</div></div>';
-  h+='<div style="background:var(--card);padding:14px 18px;border-radius:10px"><div style="font-size:22px;font-weight:700;color:var(--amber)">'+customers.length+'</div><div style="font-size:11px;color:var(--muted)">👥 独立客户</div></div>';
-  document.getElementById('adminStats').innerHTML=h;
-}
-function renderAdminTable(){
-  var db=getDB();
-  var search=(document.getElementById('adminSearch').value||'').toLowerCase();
-  var sort=document.getElementById('adminSort').value;
-  db=db.filter(function(r){return!search||(r.customerName||'').toLowerCase().indexOf(search)>-1||(r.rawText||'').toLowerCase().indexOf(search)>-1});
-  if(sort==='oldest')db.reverse();
-  var tbody=document.getElementById('adminTableBody');
-  if(db.length===0){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px">📭 暂无匹配记录</td></tr>';return}
-  var h='';
-  db.forEach(function(r){
-    var p=(r.rawText||'').replace(/<[^>]*>/g,'').substring(0,50);
-    var tags=(r.tags||[]).slice(0,3).map(function(t){return'<span class="a-tag">'+escHtml(t)+'</span>'}).join('');
-    h+='<tr>';
-    h+='<td style="white-space:nowrap">'+r.createdAt+'</td>';
-    h+='<td><b style="color:var(--slate)">'+escHtml(r.customerName||'未命名')+'</b></td>';
-    h+='<td style="font-size:11px">'+escHtml(r.customerInfo||'')+'</td>';
-    h+='<td class="a-preview" onclick="viewDetail(\''+r.id+'\')">'+escHtml(p)+'</td>';
-    h+='<td>'+tags+'</td>';
-    h+='<td><button class="a-btn" onclick="viewDetail(\''+r.id+'\')">查看</button><button class="a-btn" onclick="deleteOne(\''+r.id+'\')" style="color:var(--red)">删除</button></td>';
-    h+='</tr>';
-  });
-  tbody.innerHTML=h;
-}
-
-// ===== 导入导出 =====
+// ===== 导出 =====
 function exportAllDB(){
   var db=getDB();
   var backup={exportedAt:new Date().toISOString(),totalRecords:db.length,reviews:db};
@@ -584,31 +570,6 @@ function exportAllDB(){
   a.href=url;a.download='复盘数据备份-'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   showStatus('✅ 已导出 '+db.length+' 条记录',false);
-}
-function importDB(input){
-  var file=input.files[0];if(!file)return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      var data=JSON.parse(e.target.result);
-      var reviews=data.reviews||data;
-      if(!Array.isArray(reviews)){alert('格式错误：需要包含reviews数组');return}
-      var db=getDB();
-      var existing=new Set(db.map(function(r){return r.id}));
-      var added=0;
-      reviews.forEach(function(r){if(!existing.has(r.id)){db.push(r);added++}});
-      setDB(db);updateCounts();renderAdmin();renderHistory();
-      showStatus('✅ 导入成功：新增 '+added+' 条，去重 '+(reviews.length-added)+' 条',false);
-    }catch(e){alert('JSON解析失败：'+e.message)}
-  };
-  reader.readAsText(file);
-  input.value='';
-}
-function clearAllDB(){
-  if(!confirm('⚠️ 确定清空全部复盘数据？此操作不可恢复！\n建议先导出备份。'))return;
-  if(!confirm('再次确认：真的要删除所有 '+getDB().length+' 条记录？'))return;
-  setDB([]);updateCounts();renderAdmin();renderHistory();
-  showStatus('已清空',false);
 }
 
 // ===== UI =====
@@ -974,6 +935,274 @@ function enrichWithKB(reportHTML,kbResults,txt){
     return reportHTML.substring(0,insertionPoint)+refHtml+'\n\n'+reportHTML.substring(insertionPoint);
   }
   return reportHTML+refHtml;
+}
+
+// ===== 隐藏管理后台入口（双击标题 / 点击副标题） =====
+function openAdminPanel(){
+  window.open('admin.html','_blank');
+}
+function scrollToOutput(){
+  document.getElementById('outputCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ===== 多轮次追问系统 =====
+function sendFollowUp(){
+  if(!currentReport){alert('请先完成初始复盘分析');return}
+  var q=document.getElementById('followUpInput').value.trim();
+  if(!q||q.length<3){alert('请输入追问内容');return}
+
+  var btn=document.querySelector('#followUpSection button');
+  btn.disabled=true;btn.textContent='分析中...';
+
+  // 生成追问分析
+  var response=buildFollowUpResponse(q,currentReport.rawText,currentReport._rounds);
+  var now=formatNow();
+  var roundNum=(currentReport._rounds||[]).length+1;
+
+  // 记录追问
+  if(!currentReport._rounds)currentReport._rounds=[];
+  currentReport._rounds.push({round:roundNum,type:'followup',question:q,analysis:response,timestamp:now});
+  currentReport.rawText+='\n[追问'+roundNum+'] '+q;
+  currentReportHTML+=response;
+
+  // 添加到追问线程
+  var thread=document.getElementById('followUpThread');
+  var item=document.createElement('div');
+  item.style.marginBottom='16px';
+  item.style.border='1px solid var(--border)';
+  item.style.borderRadius='10px';
+  item.style.overflow='hidden';
+  item.innerHTML=
+    '<div style="background:#F0EBF8;padding:10px 14px;font-size:13px;font-weight:600;color:var(--purple);display:flex;justify-content:space-between">'+
+      '<span>💬 追问 '+(currentReport._rounds.length-1)+'</span>'+
+      '<span style="font-weight:400;font-size:12px;color:var(--muted)">'+now+'</span>'+
+    '</div>'+
+    '<div style="padding:12px 14px;background:#FBF9FC;border-bottom:1px solid var(--border);font-size:13px;color:var(--slate)">'+
+      '<span style="font-weight:600">Q：</span>'+escHtml(q)+
+    '</div>'+
+    '<div style="padding:14px;font-size:13px;line-height:1.8">'+response+'</div>';
+  thread.appendChild(item);
+
+  // 清空输入框
+  document.getElementById('followUpInput').value='';
+  btn.disabled=false;btn.textContent='发送 ➤';
+  thread.scrollTop=thread.scrollHeight;
+}
+
+// ===== 追问分析引擎（规则生成） =====
+function buildFollowUpResponse(question,originalText,rounds){
+  var q=question.toLowerCase();
+
+  // 检测追问意图
+  var intent='general';
+  if(q.indexOf('真实顾虑')>-1||q.indexOf('真正原因')>-1||q.indexOf('深层')>-1||q.indexOf('背后')>-1||q.indexOf('核心')>-1||q.indexOf('本质')>-1){
+    intent='deep_concern';
+  }else if(q.indexOf('下次')>-1||q.indexOf('怎么说')>-1||q.indexOf('话术')>-1||q.indexOf('切入')>-1||q.indexOf('开口')>-1||q.indexOf('怎么讲')>-1||q.indexOf('怎么回')>-1){
+    intent='next_script';
+  }else if(q.indexOf('什么客户')>-1||q.indexOf('类型')>-1||q.indexOf('画像')>-1||q.indexOf('分类')>-1||q.indexOf('属于')>-1){
+    intent='customer_type';
+  }else if(q.indexOf('方案')>-1||q.indexOf('产品')>-1||q.indexOf('推荐')>-1||q.indexOf('建议')>-1||q.indexOf('什么好')>-1){
+    intent='product_suggestion';
+  }else if(q.indexOf('总结')>-1||q.indexOf('要点')>-1||q.indexOf('核心')>-1||q.indexOf('关键')>-1||q.indexOf('重点')>-1){
+    intent='summary';
+  }else if(q.indexOf('知识库')>-1||q.indexOf('参考')>-1||q.indexOf('文章')>-1||q.indexOf('案例')>-1){
+    intent='kb_reference';
+  }else if(q.indexOf('异议')>-1||q.indexOf('反对')>-1||q.indexOf('拒绝')>-1||q.indexOf('不')>-1){
+    intent='objection_deep';
+  }
+
+  var ageMatch=originalText.match(/(\d{2,3})\s*岁/);
+  var age=ageMatch?parseInt(ageMatch[1]):0;
+
+  var R='';
+
+  switch(intent){
+    case 'deep_concern':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">🔍 深层需求溯源</div>';
+      R+='<div style="background:#FAFBFC;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+      var profile=extractProfile(originalText);
+      R+='<p><strong>客户画像锚点：</strong>'+profile+'</p>';
+      if(age>=30&&age<=50){
+        R+='<p style="margin-top:6px"><strong>年龄阶段特征：</strong>'+age+'岁，处于';
+        R+=age>=45?'财富防守期，对确定性和安全性诉求高':'财富积累期，更关注现金流的灵活性和成长性';
+        R+='</p>';
+      }
+      if(originalText.indexOf('收益')>-1||originalText.indexOf('不划算')>-1){
+        R+='<p style="margin-top:6px"><strong>真实顾虑推测：</strong>客户不是真的对比收益——他担心的"付出去的钱拿不回来怎么办"。背后是控制权和资金安全性的焦虑。</p>';
+        R+='<p style="margin-top:4px;padding-left:10px;border-left:2px solid var(--green);font-size:12px">💡 <strong>破局方向：</strong>不要比收益率——用"你的钱分两笔，一笔负责涨，一笔负责稳"重构认知。</p>';
+      }else if(originalText.indexOf('没钱')>-1||originalText.indexOf('太贵')>-1||originalText.indexOf('紧张')>-1){
+        R+='<p style="margin-top:6px"><strong>真实顾虑推测：</strong>"没钱"往往是优先级排序问题，不是真的没钱。客户潜意识是"保险的紧迫感不够"。</p>';
+        R+='<p style="margin-top:4px;padding-left:10px;border-left:2px solid var(--green);font-size:12px">💡 <strong>破局方向：</strong>用"一天多少钱"拆解，把大额支出转化为日常可感知的小支出。</p>';
+      }else if(originalText.indexOf('考虑')>-1||originalText.indexOf('看看')>-1||originalText.indexOf('了解')>-1){
+        R+='<p style="margin-top:6px"><strong>真实顾虑推测：</strong>"我只是了解"是拖延信号。客户本质在等一个"不得不做"的理由。</p>';
+        R+='<p style="margin-top:4px;padding-left:10px;border-left:2px solid var(--green);font-size:12px">💡 <strong>破局方向：</strong>给一个决策倒计时——"这个政策/费率到月底调整"。</p>';
+      }else{
+        R+='<p style="margin-top:6px"><strong>一般性建议：</strong>用杨笑5步法的"探知"环节深挖——"方便问一下，您最担心的是哪方面？"让客户自己说出真实顾虑。</p>';
+      }
+      R+='</div></div>';
+      break;
+
+    case 'next_script':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">🎯 下次面谈话术建议</div>';
+      var objs=extractObjections(originalText);
+      if(objs.length>0){
+        R+='<div style="background:#F0F7FF;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+        R+='<p style="margin-bottom:8px">上次客户提出的异议 <strong style="color:var(--purple)">「'+objs[0].text+'」</strong>，下次可以这样切入：</p>';
+        R+='<div style="background:#FFF;padding:10px 14px;border-radius:6px;border:1px dashed var(--border);margin:8px 0">';
+        R+='<p><strong style="color:var(--purple)">👋 开场：</strong>"上次您提到'+objs[0].text+'，回头我又想了想，觉得您这个问题问得特别好——说明您对这事真的上心。"</p>';
+        R+='<p style="margin-top:6px"><strong style="color:var(--green)">🎯 切入：</strong>"刚好这几天我看到一个案例/政策调整，和您说的情况特别像，花三五分钟和您说说？"</p>';
+        R+='<p style="margin-top:6px"><strong style="color:var(--purple)">💡 金句：</strong>"好问题比好答案更值钱——您能问出这个，说明已经开始用老板的视角想问题了。"</p>';
+        R+='</div></div>';
+      }else{
+        R+='<div style="background:#FAFBFC;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+        R+='<p>建议下次面谈使用 <strong>"三段式切入法"：</strong></p>';
+        R+='<div style="background:#FFF;padding:10px 14px;border-radius:6px;border:1px dashed var(--border);margin:8px 0">';
+        R+='<p><strong>Step 1 暖场：</strong>"上次和您聊完，我又做了点功课，发现了一个有意思的数据..."</p>';
+        R+='<p><strong>Step 2 钩子：</strong>"这个数据和您的情况特别相关，不到三分钟，听听看？"</p>';
+        R+='<p><strong>Step 3 留白：</strong>"当然，是我自己想多了的话您直接说，不耽误您时间。"</p>';
+        R+='</div></div>';
+      }
+      R+='</div>';
+      break;
+
+    case 'customer_type':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">👤 客户类型画像</div>';
+      R+='<div style="background:#FAFBFC;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+      var types=[];
+      if(age>=40)types.push('稳健防守型（40+，更关注确定性和传承）');
+      if(age<40)types.push('积极成长型（40岁以下，关注现金流和杠杆）');
+      if(originalText.indexOf('企业')>-1||originalText.indexOf('老板')>-1||originalText.indexOf('公司')>-1)types.push('企业主型（需关注家企隔离和税务筹划）');
+      if(originalText.indexOf('孩子')>-1||originalText.indexOf('教育')>-1)types.push('家庭责任型（子女教育是核心驱动力）');
+      if(originalText.indexOf('退休')>-1||originalText.indexOf('养老')>-1)types.push('养老规划型（退休生活品质是核心关切）');
+      if(types.length===0)types.push('待定类型——建议下次从"您最担心什么"切入了解');
+      R+='<p><strong>综合判断：</strong></p><ul style="padding-left:20px;margin-top:6px">';
+      types.forEach(function(t){R+='<li style="margin-bottom:4px">'+t+'</li>'});
+      R+='</ul>';
+      R+='<div style="background:#FFF8F0;border:1px solid #FED7AA;border-radius:8px;padding:10px 14px;margin-top:8px">';
+      R+='<p style="font-size:12px"><strong>💡 适配打法：</strong>'+types[0].includes('稳健')?'少讲收益，多讲确定性、安全感、法律保护':'少讲大道理，多讲数据和案例对比';
+      R+='</p></div></div></div>';
+      break;
+
+    case 'product_suggestion':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">📦 配置方向参考</div>';
+      R+='<div style="background:#FAFBFC;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+      R+='<p><strong>注意：</strong>以下为通用配置方向，具体产品的选择需要结合客户完整信息。</p>';
+      if(age>=40){
+        R+='<div style="background:#FFF;padding:10px 14px;border-radius:6px;margin:8px 0;border:1px solid var(--border)">';
+        R+='<p><strong>🛡 优先配置：</strong></p><ul style="padding-left:20px;margin:6px 0">';
+        R+='<li>养老年金（保证确定领取，补充退休现金流）</li>';
+        R+='<li>增额终身寿（资产保值+传承功能）</li>';
+        R+='<li>重疾+医疗（基础健康安全垫）</li></ul></div>';
+      }else{
+        R+='<div style="background:#FFF;padding:10px 14px;border-radius:6px;margin:8px 0;border:1px solid var(--border)">';
+        R+='<p><strong>🛡 优先配置：</strong></p><ul style="padding-left:20px;margin:6px 0">';
+        R+='<li>定期寿险（家庭责任期的必备保障）</li>';
+        R+='<li>重疾+医疗（锁定健康门槛）</li>';
+        R+='<li>年金（强制储蓄+长期锁息）</li></ul></div>';
+      }
+      R+='<p style="font-size:12px;color:var(--muted)">⚠️ 以上为自动化生成的方向性建议，具体方案需人工判断。</p>';
+      R+='</div></div>';
+      break;
+
+    case 'summary':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">📝 要点总结</div>';
+      R+='<div style="background:#F0F7FF;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+      var themes=extractThemes(originalText);
+      var objs2=extractObjections(originalText);
+      R+='<p><strong>讨论主题：</strong>'+(themes||'未明确')+'</p>';
+      R+='<p style="margin-top:6px"><strong>核心异议：</strong>'+(objs2.length>0?objs2.map(function(o){return o.text}).join(' | '):'未检测到明确异议')+'</p>';
+      R+='<p style="margin-top:6px"><strong>客户画像：</strong>'+extractProfile(originalText)+'</p>';
+      R+='<p style="margin-top:6px"><strong>当前轮次：</strong>'+( (rounds?rounds.length:0)+1 )+'轮对话</p>';
+      R+='<div style="background:#FFF8F0;border:1px solid #FED7AA;border-radius:8px;padding:10px 14px;margin-top:8px">';
+      R+='<p style="font-size:12px"><strong>💡 一句话建议：</strong>'+['高手不是不犯错，是同样的错不犯第二次。','复盘的深度，决定下次面谈的高度。','客户的拒绝是路标，不是终点。','每一次复盘，都是在给自己的专业能力充值。'][Math.floor(Math.random()*4)]+'</p>';
+      R+='</div></div></div>';
+      break;
+
+    case 'kb_reference':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">📚 知识库深度检索</div>';
+      R+='<div style="background:#FAFBFC;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+      var kbTopics=extractTopicsForKB(originalText+' '+q);
+      if(kbTopics.length>0&&kbItems.length>0){
+        R+='<p>相关话题：<strong>'+kbTopics.join('、')+'</strong></p>';
+        var results=searchKBForTopics(originalText+' '+q);
+        if(results.length>0){
+          R+='<div style="margin-top:8px">';
+          results.slice(0,5).forEach(function(e,i){
+            R+='<div style="background:#FFF;padding:8px 12px;border-radius:6px;border:1px solid var(--border);margin-bottom:6px">';
+            R+='<div style="font-size:12px;font-weight:600;color:var(--slate)">'+(i+1)+'. '+escHtml(e.title)+'</div>';
+            R+='<div style="font-size:11px;color:var(--muted)">📂 '+escHtml((e.category||'').replace(/[/\\]/g,' · '))+'</div>';
+            if(e.snippet)R+='<div style="font-size:11px;color:var(--text);margin-top:2px">'+escHtml(e.snippet.substring(0,100))+'...</div>';
+            R+='</div>';
+          });
+          R+='</div>';
+        }else{
+          R+='<p style="color:var(--muted);margin-top:6px">📭 未找到相关文章。</p>';
+        }
+      }else if(!kbItems.length){
+        R+='<p style="color:var(--amber)">⚠️ 知识库索引未加载，请检查 kb-index.json 文件。</p>';
+      }else{
+        R+='<p style="color:var(--muted)">未识别到相关话题关键词。</p>';
+      }
+      R+='</div></div>';
+      break;
+
+    case 'objection_deep':
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">🚧 异议深度拆解</div>';
+      var objs3=extractObjections(originalText);
+      if(objs3.length>0){
+        objs3.forEach(function(obj,i){
+          R+='<div style="background:#FAFBFC;border:1px solid var(--border);padding:12px 16px;border-radius:8px;margin-bottom:10px">';
+          R+='<div style="font-weight:600;margin-bottom:6px;color:var(--slate)">异议 '+(i+1)+'：'+obj.text+'</div>';
+          R+='<div style="font-size:12px;line-height:1.8">';
+          R+='<p><strong>表面意思：</strong>客户在表达'+obj.text+'</p>';
+          R+='<p><strong>深层含义：</strong>'+{
+            '收益':'客户要的不是高收益——他要的是"确定不会亏"',
+            '贵':'客户觉得不值这个价——需要重新构建价值认知',
+            '有':'客户觉得够用了——需要让他看到现有保障的缺口',
+            '买':'客户还在犹豫——需要一个"不买会怎样"的场景推演',
+            '不':'客户有未被满足的需求——需要先找出来再解决'
+          }[Object.keys({
+            '收益':obj.text.indexOf('收益')>-1||obj.text.indexOf('回报')>-1,
+            '贵':obj.text.indexOf('贵')>-1||obj.text.indexOf('钱')>-1||obj.text.indexOf('费')>-1,
+            '有':obj.text.indexOf('有')>-1||obj.text.indexOf('买')>-1||obj.text.indexOf('够')>-1,
+            '买':obj.text.indexOf('考虑')>-1||obj.text.indexOf('看看')>-1||obj.text.indexOf('想')>-1,
+            '不':true
+          }).find(function(k){return{true:k}[k]})] || '需要更多信息才能判断';
+          R+='</p>';
+          R+='<div style="background:#F0EBF8;padding:8px 12px;border-radius:6px;margin-top:6px">';
+          R+='<strong style="color:var(--purple)">💡 破局：</strong>'+genAltResponse(obj.text,'reframe');
+          R+='</div></div></div>';
+        });
+      }else{
+        R+='<p style="color:var(--muted)">未检测到明确异议点。</p>';
+      }
+      R+='</div>';
+      break;
+
+    default:
+      R+='<div style="margin-bottom:12px">';
+      R+='<div style="font-size:14px;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:10px;border-left:3px solid var(--purple)">💭 深度分析</div>';
+      R+='<div style="background:#FAFBFC;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.8">';
+      R+='<p>针对您提出的问题 <strong>"'+escHtml(q)+'"</strong>，建议从以下角度思考：</p>';
+      R+='<ul style="padding-left:20px;margin:8px 0">';
+      R+='<li>重新梳理客户的需求层级——从"想买什么"到"真正要解决什么问题"</li>';
+      R+='<li>客户的决策链条中谁在影响他？家庭/伴侣/合伙人？</li>';
+      R+='<li>时间轴推演——"如果三年后再来回顾这个决定，您会怎么想？"</li>';
+      R+='</ul>';
+      R+='<div style="background:#FFF8F0;border:1px solid #FED7AA;border-radius:8px;padding:10px 14px;margin-top:6px">';
+      R+='<p style="font-size:12px">💡 建议用杨笑的"探知"环节进一步了解："关于这个问题，方便说说您是怎么想的吗？"</p>';
+      R+='</div></div></div>';
+      break;
+  }
+
+  return R;
 }
 </script>
 </body>

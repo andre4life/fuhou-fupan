@@ -58,8 +58,21 @@ tr:hover{background:#F7F9FC}
 
 .status-bar{position:fixed;bottom:16px;right:16px;padding:8px 20px;border-radius:20px;color:#fff;font-size:12px;z-index:200;opacity:0;transition:all .3s;transform:translateY(10px)}
 .status-bar.show{opacity:1;transform:translateY(0)}
-.status-bar.success{background:var(--green)}
-.status-bar.error{background:var(--red)}
+  .status-bar.success{background:var(--green)}
+  .status-bar.error{background:var(--red)}
+
+  /* 登录页 */
+  .login-screen{display:none;justify-content:center;align-items:center;min-height:90vh}
+  .login-box{background:#fff;padding:44px 36px;border-radius:18px;box-shadow:0 4px 30px rgba(0,0,0,.08);text-align:center;max-width:380px;width:100%}
+  .login-box .lock-icon{font-size:48px;margin-bottom:12px}
+  .login-box h2{font-size:20px;margin-bottom:4px;color:var(--slate)}
+  .login-box p{font-size:13px;color:var(--muted);margin-bottom:24px}
+  .login-box input{width:100%;padding:11px 16px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;outline:none;margin-bottom:14px;text-align:center;letter-spacing:2px}
+  .login-box input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(107,70,193,.06)}
+  .login-box button{width:100%;padding:11px;background:var(--purple);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+  .login-box button:hover{background:#5a2d9e}
+  .login-box .login-error{color:var(--red);font-size:12px;margin-top:10px;display:none}
+  .login-box .login-note{font-size:11px;color:var(--muted);margin-top:14px}
 
 @media(max-width:768px){
   .stat-row{grid-template-columns:repeat(2,1fr)}
@@ -70,6 +83,21 @@ tr:hover{background:#F7F9FC}
 </style>
 </head>
 <body>
+<!-- ===== 登录页面 ===== -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="lock-icon">🔐</div>
+    <h2>管理员验证</h2>
+    <p>请输入管理密码查看后台数据</p>
+    <input type="password" id="passInput" placeholder="输入密码" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">确 认 登 录</button>
+    <div class="login-error" id="passError">❌ 密码错误，请重试</div>
+    <div class="login-note">提示：默认密码请在开发者后台设置页面修改</div>
+  </div>
+</div>
+
+<!-- ===== 管理后台主体 ===== -->
+<div id="adminContent" style="display:none">
 <div class="container">
 
 <div class="header">
@@ -79,6 +107,7 @@ tr:hover{background:#F7F9FC}
   </div>
   <div class="header-right">
     <button class="btn-outline" onclick="exportBackup()" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:#fff">📥 导出备份</button>
+    <button class="btn-outline" onclick="changePassword()" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:#fff">🔑 修改密码</button>
     <button class="btn-green" onclick="window.open('index.html','_blank')">🚀 打开用户端</button>
   </div>
 </div>
@@ -160,8 +189,50 @@ tr:hover{background:#F7F9FC}
 
 <script>
 var DB_KEY = 'review_engine_v3_db';
+var PASS_KEY = 'fuhou_admin_pass';
+var DEFAULT_PASS = 'fuhou888';
 
-document.addEventListener('DOMContentLoaded', renderAll);
+// ===== 登录验证 =====
+document.addEventListener('DOMContentLoaded', function(){
+  var authed = sessionStorage.getItem('admin_authed');
+  if(authed === 'true') {
+    showAdmin();
+  } else {
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+});
+
+function login(){
+  var pass = document.getElementById('passInput').value.trim();
+  if(!pass) return;
+  var stored = localStorage.getItem(PASS_KEY) || DEFAULT_PASS;
+  if(pass === stored){
+    sessionStorage.setItem('admin_authed', 'true');
+    showAdmin();
+  } else {
+    document.getElementById('passError').style.display = 'block';
+    document.getElementById('passInput').value = '';
+  }
+}
+
+function showAdmin(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminContent').style.display = 'block';
+  renderAll();
+}
+
+function changePassword(){
+  var cur = prompt('请输入当前密码：');
+  if(!cur) return;
+  var stored = localStorage.getItem(PASS_KEY) || DEFAULT_PASS;
+  if(cur !== stored){ alert('当前密码错误'); return; }
+  var np = prompt('请输入新密码（至少4位）：');
+  if(!np || np.length < 4){ alert('密码至少4位'); return; }
+  var np2 = prompt('请再次输入新密码：');
+  if(np !== np2){ alert('两次输入不一致'); return; }
+  localStorage.setItem(PASS_KEY, np);
+  alert('✅ 密码已更新');
+}
 
 function loadDB(){
   try{var d=localStorage.getItem(DB_KEY);return d?JSON.parse(d):[]}
@@ -176,7 +247,6 @@ function renderAll(){
 function renderStats(){
   var db = loadDB();
   var now = new Date();
-  var today = now.toDateString();
   var weekAgo = new Date(now - 7*24*60*60*1000);
   var monthAgo = new Date(now - 30*24*60*60*1000);
   var customers = new Set(db.map(function(r){return r.customerName}));
@@ -223,8 +293,10 @@ function renderTable(){
   filtered.forEach(function(r){
     var preview = (r.rawText||'').replace(/<[^>]*>/g,'').substring(0,60);
     var tags = (r.tags||[]).slice(0,3).map(function(t){return '<span class="tag">'+escHtml(t)+'</span>'}).join('');
+    // 显示追问数
+    var roundBadge = (r.rounds&&r.rounds.length>1)?'<span style="font-size:10px;color:var(--purple);margin-left:4px">💬'+(r.rounds.length-1)+'轮</span>':'';
     html += '<tr>';
-    html += '<td style="white-space:nowrap">'+r.createdAt+'</td>';
+    html += '<td style="white-space:nowrap">'+r.createdAt+roundBadge+'</td>';
     html += '<td><span class="customer-badge">'+escHtml(r.customerName||'未命名')+'</span></td>';
     html += '<td style="color:var(--muted);font-size:12px">'+escHtml(r.customerInfo||'')+'</td>';
     html += '<td class="preview-cell" onclick="viewDetail(\''+r.id+'\')">'+escHtml(preview)+'</td>';
@@ -244,7 +316,26 @@ function viewDetail(id){
   var r = db.find(function(x){return x.id===id});
   if(!r) return;
   document.getElementById('modalTitle').textContent = '复盘详情：'+r.customerName+' | '+r.createdAt;
-  document.getElementById('modalBody').innerHTML = r.analysis || '<p style="color:var(--muted)">暂无分析内容</p><pre style="white-space:pre-wrap;font-size:12px;margin-top:12px;background:#F7F9FC;padding:12px;border-radius:8px">'+escHtml(r.rawText||'')+'</pre>';
+  // 支持多轮次展示
+  var html='';
+  if(r.rounds&&r.rounds.length>0){
+    r.rounds.forEach(function(round,i){
+      var isInitial=round.type==='initial';
+      html+='<div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+      html+='<div style="background:'+(isInitial?'var(--slate)':'var(--purple)')+';color:#fff;padding:8px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center">';
+      html+='<span><b>'+(isInitial?'📋 初始复盘':'💬 第'+i+'轮追问')+'</b></span>';
+      html+='<span style="opacity:.7;font-size:11px">'+round.timestamp+'</span>';
+      if(!isInitial) html+='<span style="font-size:11px;opacity:.8;margin-left:8px">问：'+escHtml(round.question||'')+'</span>';
+      html+='</div>';
+      html+='<div style="padding:14px;font-size:13px;line-height:1.7">'+(round.analysis||'<p style="color:var(--muted)">暂无分析</p>')+'</div>';
+      html+='</div>';
+    });
+  }else if(r.analysis){
+    html=r.analysis;
+  }else{
+    html='<p style="color:var(--muted)">暂无分析内容</p><pre style="white-space:pre-wrap;font-size:12px;margin-top:12px;background:#F7F9FC;padding:12px;border-radius:8px">'+escHtml(r.rawText||'')+'</pre>';
+  }
+  document.getElementById('modalBody').innerHTML=html;
   document.getElementById('detailModal').classList.add('show');
 }
 
@@ -313,5 +404,6 @@ function showStatus(msg, isErr){
 
 function escHtml(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
+</div>
 </body>
 </html>
