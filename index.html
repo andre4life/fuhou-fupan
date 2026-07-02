@@ -48,6 +48,11 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
 .record-status{font-size:13px;color:var(--muted);margin-top:8px}
 .transcribed-text{background:#F7FAFC;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px;font-size:14px;max-height:200px;overflow-y:auto;white-space:pre-wrap;display:none}
 .transcribed-text.show{display:block}
+.transcribed-textarea{width:100%;min-height:120px;padding:14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;line-height:1.8;resize:vertical;background:#F7FAFC;margin-top:14px;display:none}
+.transcribed-textarea.show{display:block}
+.transcribed-textarea.editable{background:#fff;border-color:var(--purple);box-shadow:0 0 0 3px rgba(107,70,193,.06)}
+.transcribed-edit-hint{font-size:12px;color:var(--muted);margin-top:6px;text-align:right;display:none}
+.transcribed-edit-hint.show{display:block}
 
 .btn{display:block;width:100%;padding:12px;background:var(--purple);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:all .2s}
 .btn:hover{background:#5a2d9e}
@@ -175,7 +180,8 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
       <button class="record-btn" id="recBtn" onclick="toggleRecording()">🎙️</button>
       <div class="record-status" id="recStatus">点击录音，照模板说（说完再点一次停止）</div>
     </div>
-    <div class="transcribed-text" id="transcribedText"></div>
+    <textarea class="transcribed-textarea" id="transcribedText" readonly placeholder="语音识别结果将显示在这里..."></textarea>
+    <div class="transcribed-edit-hint" id="editHint">✏️ 点击此处可直接修改识别文字</div>
   </div>
   <div class="tab-content" id="tab-manual">
     <div class="template-guide"><strong>📋 填写模板：</strong> 客户画像→讨论主题→异议处理→结果反思</div>
@@ -275,6 +281,11 @@ document.addEventListener('DOMContentLoaded',function(){
   if(name)document.getElementById('customerName').value=name;
   updateCounts();
   loadKBIndex();
+  // 语音识别文本的手动编辑同步
+  document.getElementById('transcribedText').addEventListener('input',function(){
+    reviewText=this.value;
+    voiceBaseText=this.value;
+  });
 });
 function persistCustomerName(){
   var name=document.getElementById('customerName').value.trim();
@@ -331,9 +342,10 @@ function toggleRecording(){
       // 保留之前会话的文本 + 追加本次识别结果
       reviewText=voiceBaseText+t;
       var el=document.getElementById('transcribedText');
-      el.textContent=reviewText;
+      el.value=reviewText;
       el.style.color='var(--text)';
       if(reviewText.length>0)el.classList.add('show');
+      document.getElementById('editHint').classList.add('show');
     };
     sr.onerror=function(e){
       voiceBaseText=reviewText;  // 出错时也保留已识别内容
@@ -343,8 +355,13 @@ function toggleRecording(){
     sr.onend=function(){
       btn.classList.remove('recording');
       voiceBaseText=reviewText;  // 中断时冻结当前文本，下次追加
+      // 让文本可编辑
+      var el=document.getElementById('transcribedText');
+      el.removeAttribute('readonly');
+      el.classList.add('editable');
+      document.getElementById('editHint').classList.add('show');
       if(reviewText.length>0){
-        document.getElementById('recStatus').textContent='✅ 已识别 '+reviewText.length+' 字';
+        document.getElementById('recStatus').textContent='✅ 已识别 '+reviewText.length+' 字（可手动修改）';
       }else{
         document.getElementById('recStatus').textContent='未识别到内容';
       }
@@ -353,14 +370,25 @@ function toggleRecording(){
   // 只有首次启动时清空（无已识别内容）
   if(!voiceBaseText){
     reviewText='';
-    document.getElementById('transcribedText').textContent='';
-    document.getElementById('transcribedText').classList.remove('show');
+    var el=document.getElementById('transcribedText');
+    el.value='';
+    el.classList.remove('show');
+    document.getElementById('editHint').classList.remove('show');
   }
+  // 录音中设为只读
+  document.getElementById('transcribedText').setAttribute('readonly','true');
+  document.getElementById('transcribedText').classList.remove('editable');
   sr.start();btn.classList.add('recording');document.getElementById('recStatus').textContent='🎙️ 正在听...';
+}
 }
 function stopVoiceReview(){
   if(sr)sr.stop();
   document.getElementById('recBtn').classList.remove('recording');
+  // 用户手动停止 → 文字可编辑
+  var el=document.getElementById('transcribedText');
+  el.removeAttribute('readonly');
+  el.classList.add('editable');
+  document.getElementById('editHint').classList.add('show');
 }
 
 // ===== 分析引擎 =====
@@ -369,7 +397,10 @@ async function analyzeReview(){
     var cname=document.getElementById('customerName').value.trim();
     if(!cname){alert('请先输入客户姓名');return}
     var txt='';
-    if(document.getElementById('tab-record').classList.contains('active')){txt=reviewText.trim();if(!txt){alert('请先录音或切换手动填写');return}}
+    if(document.getElementById('tab-record').classList.contains('active')){
+      txt=document.getElementById('transcribedText').value.trim();
+      if(!txt){alert('请先录音或切换手动填写');return}
+    }
     else{txt=document.getElementById('manualText').value.trim()}
     if(!txt||txt.length<20){alert('内容太短，至少20字');return}
 
