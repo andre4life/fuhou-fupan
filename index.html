@@ -380,7 +380,6 @@ function toggleRecording(){
   document.getElementById('transcribedText').classList.remove('editable');
   sr.start();btn.classList.add('recording');document.getElementById('recStatus').textContent='🎙️ 正在听...';
 }
-}
 function stopVoiceReview(){
   if(sr)sr.stop();
   document.getElementById('recBtn').classList.remove('recording');
