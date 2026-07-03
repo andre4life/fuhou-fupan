@@ -137,6 +137,7 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
 .upload-zone:hover{border-color:var(--purple);background:#F8F6FC}
 
 /* 手机录音按钮——文件选择器叠在麦克风按钮上 */
+#audioFilePicker{display:none}  /* 默认隐藏 */
 .mic-wrapper{position:relative;display:inline-block}
 #audioFilePicker.mobile-overlay{
   display:block;
@@ -204,9 +205,7 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
       <div class="mic-wrapper">
         <button class="record-btn" id="recBtn" onclick="toggleRecording()" type="button">🎙️</button>
         <!-- 文件选择器：静态在DOM中，叠在按钮上，手机直接触摸打开原生录音 -->
-        <input type="file" accept="audio/*" id="audioFilePicker"
-               style="display:none"
-               capture>
+        <input type="file" accept="audio/*" id="audioFilePicker" capture>
       </div>
       <div class="record-status" id="recStatus">点击录音，照模板说（说完再点一次停止）</div>
     </div>
