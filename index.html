@@ -136,6 +136,23 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
 .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;margin-top:12px;cursor:pointer;transition:all .2s}
 .upload-zone:hover{border-color:var(--purple);background:#F8F6FC}
 
+/* 手机录音按钮——文件选择器叠在麦克风按钮上 */
+.mic-wrapper{position:relative;display:inline-block}
+#audioFilePicker.mobile-overlay{
+  display:block;
+  position:absolute;
+  top:0;left:0;
+  width:68px;height:68px;
+  opacity:0;cursor:pointer;
+  border-radius:50%;
+  z-index:10;
+  margin:0;padding:0;
+  border:none;
+  /* 关键：让文件选择器触控完全覆盖按钮区域 */
+  touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+}
+
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
@@ -184,7 +201,13 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)
       情绪变化：<strong>XX → XX → XX</strong>。结果：<strong>XX</strong>。反思：<strong>XX</strong>。"
     </div>
     <div class="record-area">
-      <button class="record-btn" id="recBtn" onclick="toggleRecording()">🎙️</button>
+      <div class="mic-wrapper">
+        <button class="record-btn" id="recBtn" onclick="toggleRecording()" type="button">🎙️</button>
+        <!-- 文件选择器：静态在DOM中，叠在按钮上，手机直接触摸打开原生录音 -->
+        <input type="file" accept="audio/*" id="audioFilePicker"
+               style="display:none"
+               capture>
+      </div>
       <div class="record-status" id="recStatus">点击录音，照模板说（说完再点一次停止）</div>
     </div>
     <textarea class="transcribed-textarea" id="transcribedText" readonly placeholder="语音识别结果将显示在这里..."></textarea>
@@ -301,13 +324,23 @@ document.addEventListener('DOMContentLoaded',function(){
       var notice=document.getElementById('wechatNotice');
       if(notice){
         if(isWeChat){
-          notice.innerHTML='📱 微信内点击🎙️麦克风按钮即可调用<strong>手机原生录音机</strong>，录完后自动生成回放播放器，收听后再手动输入复盘内容。';
+          notice.innerHTML='📱 直接点击🎙️麦克风按钮，即可调用<strong>手机原生录音机</strong>录复盘内容，录完后自动生成回放播放器，收听后再手动输入。';
         }else{
           notice.innerHTML='🌐 当前浏览器不支持自动语音识别，但您仍可<strong>录音后收听回放</strong>，再手动输入复盘内容。';
         }
         notice.style.display='block';
       }
-      // 不隐藏语音标签页 — 用 文件选择器/MediaRecorder 录音 + 手动转录
+
+      // 【核心修复】手机端：立即显示文件选择器叠层在按钮上
+      // 用户触摸麦克风区域 → 直接触摸到叠层的<input type=file>
+      // → 弹出手机原生录音界面  → 无需任何JS的click()调用
+      var fp=document.getElementById('audioFilePicker');
+      if(fp){
+        fp.className='mobile-overlay';
+        // 挂载change事件处理
+        fp.removeEventListener('change',handleAudioPick);
+        fp.addEventListener('change',handleAudioPick);
+      }
     }
   }catch(e){
     console.warn('初始化异常:',e);
@@ -510,9 +543,9 @@ function toggleMediaRec(){
     });
 }
 
-// ===== 方案A：文件选择器录音（微信/手机专用） =====
-// 利用原生<input type="file" accept="audio/*">调用手机自带录音
-// 无需getUserMedia，无需权限，微信完全兼容
+// ===== 方案A：原生文件选择器录音（微信/手机专用） =====
+// 把<input type=file>叠在麦克风按钮上方→用户直接触摸原生入口
+// 无需getUserMedia，无需程序化click()，微信X5内核完美兼容
 function pickAudioFile(){
   var btn=document.getElementById('recBtn');
 
@@ -520,45 +553,59 @@ function pickAudioFile(){
   var oldAp=document.getElementById('audioPlayerWrap');
   if(oldAp)oldAp.remove();
 
-  document.getElementById('recStatus').textContent='📱 打开录音中...';
-
+  // 获取静态输入框，叠在按钮上
   var input=document.getElementById('audioFilePicker');
   if(!input){
+    // 兜底：DOM中不存在才创建
     input=document.createElement('input');
     input.type='file';
     input.id='audioFilePicker';
-    input.accept='audio/*';     // 只选音频文件
-    input.capture='true';       // 直接启动录音机（手机支持的话）
+    input.accept='audio/*';
     input.style.display='none';
     document.body.appendChild(input);
-
-    input.addEventListener('change',function(e){
-      var file=e.target.files[0];
-      if(!file){
-        document.getElementById('recStatus').textContent='⚠️ 未录制音频，请重试';
-        return;
-      }
-      // 创建音频播放
-      var url=URL.createObjectURL(file);
-      // 粗略估算时长
-      var ext=file.name.split('.').pop().toLowerCase();
-      // 手机录音常见格式：iOS→.m4a, Android→.amr/.ogg/.mp4
-      // 用文件大小估秒数（大致：m4a约8KB/s, amr约1KB/s）
-      var kbPerSec=8;
-      if(ext==='amr')kbPerSec=1.2;
-      else if(ext==='ogg')kbPerSec=5;
-      else if(ext==='mp4')kbPerSec=10;
-      var dur=Math.max(1,Math.round(file.size/1024/kbPerSec));
-      showAudioPlayer(url,dur);
-      showTranscriptionInput();
-      document.getElementById('recStatus').textContent='✅ 录音已完成！可点击上方的▶️播放听取';
-      // 重置input以允许重复录制同一文件
-      e.target.value='';
-    });
+    input.addEventListener('change',handleAudioPick);
   }
-  // 微信X5内核的特殊处理：先触屏交互再触发文件选择器
-  // 使用setTimeout确保在用户手势上下文中触发
-  setTimeout(function(){input.click()},100);
+
+  // 叠层覆盖——用户直接触摸input，不走程序化click
+  input.className='mobile-overlay';
+  document.getElementById('recStatus').textContent='👆 点击麦克风按钮，打开手机录音机';
+  // 重置以允许重复选择同一文件
+  input.value='';
+}
+
+// ===== 文件选择器 change 事件处理 =====
+// 用户录音完成后自动被调用
+function handleAudioPick(e){
+  var file=e.target.files[0];
+  if(!file){
+    document.getElementById('recStatus').textContent='⚠️ 未录制音频，请重试';
+    hideOverlay();
+    return;
+  }
+  // 创建音频播放URL
+  var url=URL.createObjectURL(file);
+  // 估算时长
+  var ext=file.name.split('.').pop().toLowerCase();
+  var kbPerSec=8;
+  if(ext==='amr')kbPerSec=1.2;
+  else if(ext==='ogg')kbPerSec=5;
+  else if(ext==='mp4')kbPerSec=10;
+  var dur=Math.max(1,Math.round(file.size/1024/kbPerSec));
+  
+  showAudioPlayer(url,dur);
+  showTranscriptionInput();
+  document.getElementById('recStatus').textContent='✅ 录音已完成！可点击上方的▶️播放听取';
+  
+  // 隐藏叠层
+  hideOverlay();
+  // 重置input以允许重新录制
+  e.target.value='';
+}
+
+// ===== 隐藏文件选择器叠层 =====
+function hideOverlay(){
+  var input=document.getElementById('audioFilePicker');
+  if(input)input.className='';
 }
 
 // ===== 方案B：getUserMedia 录音（桌面浏览器专用） =====
@@ -601,7 +648,8 @@ function deleteRecording(){
   ta.value='';
   ta.classList.remove('show');
   document.getElementById('editHint').classList.remove('show');
-  document.getElementById('recStatus').textContent='🎙️ 点击麦克风按钮开始录音';
+  // 删除后重新显示叠层，方便直接再录
+  pickAudioFile();
 }
 
 // ===== 共用函数：录音完成后显示手动输入框 =====
